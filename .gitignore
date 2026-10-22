@@ -1,0 +1,16 @@
+UnityProject/Library/
+UnityProject/Temp/
+UnityProject/Logs/
+UnityProject/Obj/
+UnityProject/obj/
+UnityProject/Builds/
+UnityProject/UserSettings/
+UnityProject/*.csproj
+UnityProject/*.sln
+UnityProject/.vs/
+*.log
+release/
+web-publish/
+shots*/
+*.apk
+.DS_Store
