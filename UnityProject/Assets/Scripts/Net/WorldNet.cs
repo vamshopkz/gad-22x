@@ -92,7 +92,7 @@ namespace Gad
             string car = c != null ? c.Def.Id + ":" + c.ColorIndex : "";
             int flags = pl.Body.Pose | (pl.CC.isGrounded ? 0 : 8);
             float speed = c != null ? c.Speed : pl.PlanarSpeed;
-            Send(string.Join("|", "P", Save.D.id, (++seq).ToString(), Clean(Save.D.name), Save.D.look.Pack(),
+            Send(string.Join("|", "P", Save.D.id, (++seq).ToString(), Clean(Save.D.name), Save.D.skin.Encode(),
                 t.position.x.ToString("0.00", Inv), t.position.y.ToString("0.00", Inv), t.position.z.ToString("0.00", Inv),
                 t.eulerAngles.y.ToString("0", Inv), speed.ToString("0.0", Inv), inside.ToString(), car, flags.ToString()));
         }
@@ -169,7 +169,7 @@ namespace Gad
         public int InsideCode = -1;
         public Vector3 WorldPos;
         public string Place = "";
-        Human human;
+        Person human;
         GameObject carGo;
         Car carComp;
         string carKey = "", lookKey = "";
@@ -183,7 +183,7 @@ namespace Gad
             var go = new GameObject("Remote " + id) { layer = 11 };
             var r = go.AddComponent<RemoteAvatar>();
             r.Id = id;
-            r.human = Human.Create(go.transform, new Look(), "Body");
+            r.human = Person.Create(go.transform, new SkinSet(), "Body");
             var cc = go.AddComponent<CapsuleCollider>();
             cc.center = new Vector3(0, 0.9f, 0); cc.height = 1.8f; cc.radius = 0.3f;
             r.tag = MakeText(go.transform, 2.25f, 3.2f, Color.white);
@@ -209,7 +209,7 @@ namespace Gad
         {
             LastHeard = Time.unscaledTime;
             if (Name != name) { Name = name; tag.text = name; }
-            if (look != lookKey) { lookKey = look; human.Rebuild(Look.Unpack(look)); }
+            if (look != lookKey) { lookKey = look; human.Rebuild(SkinSet.Decode(look)); }
             bool teleport = (pos - target).sqrMagnitude > 60f * 60f || inside != InsideCode;
             InsideCode = inside;
             target = pos; yaw = yawDeg; speed = spd;

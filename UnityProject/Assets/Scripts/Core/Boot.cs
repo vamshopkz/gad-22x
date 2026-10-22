@@ -28,17 +28,20 @@ namespace Gad
             if (Has("-autotest") || Has("-mptest"))
             {
                 Save.D = new GameData { id = Save.D.id, created = true, name = Arg("-name") ?? "Тестер", money = 900000 };
-                Save.D.look = new Look { gender = Has("-female") ? 1 : 0, hairStyle = Has("-female") ? 1 : 0, shirt = 2, pants = 1, shoes = 0, top = 1, hair = 1 };
+                Save.D.skin = Has("-female") ? new SkinSet { hGender = "hg_f", hHair = "hh_long_brown", hEyes = "he_lashes", hMouth = "hm_lips", hTop = "ht_hoodie_pink", hBottom = "hb_jeans_dark" } : new SkinSet { hHair = "hh_short_black", hTop = "ht_flannel_red", hBottom = "hb_jeans_dark", hShoes = "hf_sneakers_white" };
             }
 
             UIRoot.Create();
             City.Build();
             WorldBuilder.Build();
+            FutureCity.Create();
             DayNight.Create();
             Weather.Create();
+            Reflections.Create();
             AudioFx.Create();
             PlayerCtl.Create();
             Gfx.Init();
+            PostFx.Create();
             Streamer.Create();
             Traffic.Create();
             new GameObject("Work").AddComponent<Work>();
@@ -53,7 +56,7 @@ namespace Gad
 
             if (Has("-autotest")) gameObject.AddComponent<AutoTest>();
             else if (Has("-mptest")) gameObject.AddComponent<AutoTest>().Multiplayer = true;
-            else if (!Save.D.created) Menus.Wardrobe(false, true);
+            else if (!Save.D.created) Menus.Dress(false, true);
             else Hud.Toast("С возвращением, " + Save.D.name + "!", UIKit.Cyan);
         }
 

@@ -9,7 +9,7 @@ namespace Gad
     /// colliders, and the outskirts (beach, sea, port, railway, mountains with the tunnel, airport).
     /// Street furniture, signs, trees, people and traffic are streamed around the player (Streamer).
     /// </summary>
-    public static class WorldBuilder
+    public static partial class WorldBuilder
     {
         public static Material[] Facade = new Material[8];
         public static Material Store, Roof, Asphalt, Sidewalk, Grass, Plaza, Concrete, Sand, Water, Rock, Paint, PaintYellow,
@@ -159,14 +159,17 @@ namespace Gad
                     break;
                 }
                 case BType.Tower:
+                case BType.Agency:
                 {
-                    float hl = h * 0.72f;
+                    float hl = h * (b.type == BType.Agency ? 0.8f : 0.72f);
                     m.Box(face, Roof, new Vector3(x0, y0, z0), new Vector3(x1, y0 + hl, z1), Tile, off);
                     float ins = Mathf.Min(3f, (x1 - x0) * 0.15f);
                     m.uvYStart = hl;
                     m.Box(face, Roof, new Vector3(x0 + ins, y0 + hl, z0 + ins), new Vector3(x1 - ins, y0 + h, z1 - ins), Tile, off);
                     m.uvYStart = 0;
                     Parapet(m, x0 + ins, z0 + ins, x1 - ins, z1 - ins, y0 + h, Frame);
+                    FutureCity.Outline(m, b, x0, z0, x1, z1, y0, y0 + hl);
+                    FutureCity.Outline(m, b, x0 + ins, z0 + ins, x1 - ins, z1 - ins, y0 + hl, y0 + h);
                     float cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
                     if (!b.roofHelipad)
                         m.Box(Concrete, Roof, new Vector3(cx - 4, y0 + h, cz - 3), new Vector3(cx + 4, y0 + h + 4, cz + 3), new Vector2(4, 4));
@@ -225,6 +228,8 @@ namespace Gad
                     else
                         m.Box(face, Roof, new Vector3(x0, y0, z0), new Vector3(x1, y0 + h, z1), Tile, off);
                     Parapet(m, x0, z0, x1, z1, y0 + h, b.style == 2 ? Concrete : Paint);
+                    if ((b.type == BType.Office || b.type == BType.Hotel || b.type == BType.Bank) && (b.district == District.Downtown || b.district == District.Business) && h > 18)
+                        FutureCity.Outline(m, b, x0, z0, x1, z1, y0, y0 + h);
                     // rooftop units
                     if (b.type == BType.Apartment || b.type == BType.Office || b.type == BType.Hotel || b.type == BType.Hospital)
                     {

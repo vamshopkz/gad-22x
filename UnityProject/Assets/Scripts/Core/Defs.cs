@@ -7,7 +7,7 @@ namespace Gad
     {
         Apartment, House, Villa, Tower, Office, Shop, Supermarket, Mall, CarDealer, Garage, Restaurant, Cafe, Hotel,
         Hospital, FireStation, School, University, Library, Factory, Warehouse, Bank, JobCenter, GasStation, Parking,
-        Airport, Station, Port, Clothes, Furniture, Gym
+        Airport, Station, Port, Clothes, Furniture, Gym, Agency
     }
 
     public enum District { Downtown, Business, Residential, Suburb, Beach, Industrial, Park, Outskirts }
@@ -52,6 +52,7 @@ namespace Gad
             [BType.Port] = new BInfo { Title = "Морской порт", Names = new[] { "Морской порт" }, Sign = new Color(0.1f, 0.4f, 0.7f) },
             [BType.Clothes] = new BInfo { Title = "Магазин одежды", Names = new[] { "Бутик «Стиль»", "Одежда «Тренд»", "Мода Плюс" }, BizPrice = 75000, Sign = new Color(0.9f, 0.3f, 0.6f) },
             [BType.Furniture] = new BInfo { Title = "Мебельный", Names = new[] { "Мебель «Дом»", "Интерьер Центр" }, BizPrice = 85000, Sign = new Color(0.6f, 0.45f, 0.3f) },
+            [BType.Agency] = new BInfo { Title = "Агентство недвижимости", Names = new[] { "ГАД Сити · Недвижимость" }, Sign = new Color(0.2f, 0.9f, 1f) },
             [BType.Gym] = new BInfo { Title = "Спортзал", Names = new[] { "Фитнес «Сила»", "Спортзал «Атлет»" }, BizPrice = 65000, Sign = new Color(0.95f, 0.35f, 0.1f) },
         };
     }
@@ -95,24 +96,51 @@ namespace Gad
         public static JobDef Get(string id) => All.Find(j => j.Id == id);
     }
 
-    /// <summary>Car catalogue. Shape: 0 hatch, 1 sedan, 2 SUV, 3 sport, 4 pickup, 5 van, 6 supercar.</summary>
+    /// <summary>Car catalogue: real-world proportions for every model (see CarMesh).</summary>
     public class CarDef
     {
-        public string Id, Title;
-        public int Price, Shape;
+        public string Id, Title, Sub;
+        public int Price;
         public float MaxSpeed, Accel;
+        public CarSpec Spec;
+        public int ForceColor = -1;
+        public int Shape => 1;
+        public float L => Spec.L;
+        public float W => Spec.W;
 
         public static readonly List<CarDef> All = new List<CarDef>
         {
-            new CarDef { Id = "mini", Title = "Ситикар Мини", Price = 9000, Shape = 0, MaxSpeed = 27, Accel = 6 },
-            new CarDef { Id = "sedan", Title = "Седан Комфорт", Price = 18000, Shape = 1, MaxSpeed = 33, Accel = 7 },
-            new CarDef { Id = "taxi", Title = "Седан Такси", Price = 16000, Shape = 1, MaxSpeed = 32, Accel = 7 },
-            new CarDef { Id = "pickup", Title = "Пикап Ранчо", Price = 26000, Shape = 4, MaxSpeed = 31, Accel = 7 },
-            new CarDef { Id = "van", Title = "Фургон Карго", Price = 24000, Shape = 5, MaxSpeed = 28, Accel = 5.5f },
-            new CarDef { Id = "suv", Title = "Внедорожник X5", Price = 42000, Shape = 2, MaxSpeed = 36, Accel = 8 },
-            new CarDef { Id = "sport", Title = "Спорткар GT", Price = 85000, Shape = 3, MaxSpeed = 46, Accel = 12 },
-            new CarDef { Id = "electro", Title = "Электрокар Volt", Price = 64000, Shape = 1, MaxSpeed = 41, Accel = 13 },
-            new CarDef { Id = "hyper", Title = "Гиперкар X-22", Price = 320000, Shape = 6, MaxSpeed = 58, Accel = 17 },
+            new CarDef { Id = "mini", Title = "Ситикар Мини", Sub = "городской хэтчбек", Price = 9000, MaxSpeed = 30, Accel = 6,
+                Spec = new CarSpec { L = 3.85f, W = 1.75f, H = 1.48f, WB = 2.5f, R = 0.31f, FrontOH = 0.72f, HoodY = 0.9f, DeckY = 0.95f, NoseY = 0.62f, TailY = 0.78f, TailBottom = 0.3f,
+                    ZA = 0.72f, ZB = 0.12f, ZC = -1.35f, ZD = -1.78f, Tumble = 0.82f, Grille = 2, Head = 1, Tail = 2, Exhaust = 1 } },
+            new CarDef { Id = "sedan", Title = "Седан Комфорт", Sub = "семейный седан", Price = 18000, MaxSpeed = 36, Accel = 7,
+                Spec = new CarSpec { L = 4.65f, W = 1.82f, H = 1.45f, WB = 2.75f, R = 0.32f, FrontOH = 0.9f, HoodY = 0.93f, DeckY = 0.98f, NoseY = 0.58f, TailY = 0.66f,
+                    ZA = 0.5f, ZB = -0.08f, ZC = -0.82f, ZD = -1.3f, Grille = 2, Head = 3, Tail = 1, Exhaust = 1 } },
+            new CarDef { Id = "taxi", Title = "Седан Такси", Sub = "для работы в такси", Price = 16000, MaxSpeed = 35, Accel = 7, ForceColor = 5,
+                Spec = new CarSpec { L = 4.65f, W = 1.82f, H = 1.45f, WB = 2.75f, R = 0.32f, FrontOH = 0.9f, HoodY = 0.93f, DeckY = 0.98f, NoseY = 0.58f, TailY = 0.66f,
+                    ZA = 0.5f, ZB = -0.08f, ZC = -0.82f, ZD = -1.3f, Grille = 2, Head = 3, Tail = 1, Exhaust = 1, Taxi = true } },
+            new CarDef { Id = "bmw_g30", Title = "BMW 5 Series (G30) 540i", Sub = "бизнес-седан · M Sport", Price = 65000, MaxSpeed = 52, Accel = 11.5f,
+                Spec = new CarSpec { L = 4.94f, W = 1.87f, H = 1.47f, WB = 2.975f, R = 0.335f, FrontOH = 0.86f, HoodY = 0.97f, DeckY = 1.02f, NoseY = 0.62f, NoseBottom = 0.16f, TailY = 0.7f, TailBottom = 0.3f,
+                    ZA = 0.62f, ZB = 0.02f, ZC = -0.78f, ZD = -1.32f, Tumble = 0.79f, NoseNarrow = 0.78f, Grille = 1, Head = 0, Tail = 0, Badge = true, Exhaust = 2, Spokes = 5,
+                    Caliper = new Color(0.1f, 0.28f, 0.8f) } },
+            new CarDef { Id = "pickup", Title = "Пикап Ранчо", Sub = "полноразмерный пикап", Price = 26000, MaxSpeed = 34, Accel = 7,
+                Spec = new CarSpec { L = 5.3f, W = 2.0f, H = 1.86f, WB = 3.3f, R = 0.4f, FrontOH = 0.95f, Sill = 0.4f, HoodY = 1.22f, DeckY = 1.2f, NoseY = 0.88f, NoseBottom = 0.38f, TailY = 1.0f, TailBottom = 0.55f,
+                    ZA = 1.0f, ZB = 0.45f, ZC = -0.45f, ZD = -0.72f, Tumble = 0.9f, Bed = true, Grille = 3, Head = 3, Tail = 2, Exhaust = 1 } },
+            new CarDef { Id = "van", Title = "Фургон Карго", Sub = "грузовой фургон", Price = 24000, MaxSpeed = 30, Accel = 5.5f,
+                Spec = new CarSpec { L = 5.0f, W = 2.0f, H = 2.05f, WB = 3.1f, R = 0.36f, FrontOH = 0.85f, Sill = 0.32f, HoodY = 1.08f, DeckY = 1.15f, NoseY = 0.78f, TailY = 1.2f, TailBottom = 0.4f,
+                    ZA = 1.6f, ZB = 1.05f, ZC = -2.3f, ZD = -2.44f, Tumble = 0.93f, Grille = 2, Head = 3, Tail = 2, Exhaust = 1 } },
+            new CarDef { Id = "suv", Title = "Внедорожник X5", Sub = "премиальный SUV", Price = 42000, MaxSpeed = 40, Accel = 8,
+                Spec = new CarSpec { L = 4.92f, W = 2.0f, H = 1.75f, WB = 2.97f, R = 0.39f, FrontOH = 0.9f, Sill = 0.34f, HoodY = 1.13f, DeckY = 1.14f, NoseY = 0.8f, NoseBottom = 0.3f, TailY = 0.95f, TailBottom = 0.45f,
+                    ZA = 0.75f, ZB = 0.12f, ZC = -1.75f, ZD = -2.2f, Tumble = 0.84f, Grille = 1, Head = 0, Tail = 0, RoofRails = true, Exhaust = 2 } },
+            new CarDef { Id = "sport", Title = "Спорткар GT", Sub = "купе 2+2", Price = 85000, MaxSpeed = 55, Accel = 12,
+                Spec = new CarSpec { L = 4.5f, W = 1.92f, H = 1.28f, WB = 2.65f, R = 0.35f, FrontOH = 0.95f, Sill = 0.18f, HoodY = 0.86f, DeckY = 0.9f, NoseY = 0.5f, NoseBottom = 0.12f, TailY = 0.6f, TailBottom = 0.25f,
+                    ZA = 0.32f, ZB = -0.35f, ZC = -0.85f, ZD = -1.65f, Tumble = 0.76f, Spoiler = true, Grille = 2, Head = 3, Tail = 1, Exhaust = 4, Caliper = new Color(0.85f, 0.1f, 0.1f) } },
+            new CarDef { Id = "electro", Title = "Электрокар Volt", Sub = "электро-седан будущего", Price = 64000, MaxSpeed = 50, Accel = 14,
+                Spec = new CarSpec { L = 4.7f, W = 1.9f, H = 1.44f, WB = 2.88f, R = 0.34f, FrontOH = 0.85f, HoodY = 0.92f, DeckY = 0.98f, NoseY = 0.56f, TailY = 0.7f,
+                    ZA = 0.75f, ZB = 0.05f, ZC = -0.9f, ZD = -1.45f, Tumble = 0.78f, Grille = 0, Head = 2, Tail = 1, Exhaust = 0 } },
+            new CarDef { Id = "hyper", Title = "Гиперкар X-22", Sub = "гиперкар будущего", Price = 320000, MaxSpeed = 65, Accel = 18,
+                Spec = new CarSpec { L = 4.6f, W = 2.05f, H = 1.15f, WB = 2.7f, R = 0.36f, FrontOH = 1.0f, Sill = 0.15f, HoodY = 0.74f, DeckY = 0.95f, NoseY = 0.42f, NoseBottom = 0.1f, TailY = 0.62f, TailBottom = 0.22f,
+                    ZA = 0.6f, ZB = -0.2f, ZC = -0.6f, ZD = -1.4f, Tumble = 0.72f, Wing = true, Grille = 0, Head = 3, Tail = 1, Exhaust = 2, Caliper = new Color(0.95f, 0.75f, 0.1f) } },
         };
 
         public static CarDef Get(string id) => All.Find(c => c.Id == id) ?? All[1];

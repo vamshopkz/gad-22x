@@ -21,7 +21,7 @@ namespace Gad
 
         class Walker
         {
-            public Human h;
+            public Person h;
             public int bx, bz;
             public float s;                    // position along the sidewalk loop (metres)
             public float dir, speed;
@@ -47,6 +47,25 @@ namespace Gad
             foreach (var d in I.drivers) if (d.car != null) d.car.gameObject.SetActive(on);
         }
 
+        /// <summary>The player takes this car: its driver gets out and walks away.</summary>
+        public static void TakeOver(Car c)
+        {
+            if (I != null) I.drivers.RemoveAll(d => d.car == c);
+            c.Traffic = false;
+            c.transform.SetParent(null, true);
+            if (c.Driver != null)
+            {
+                var p = c.Driver;
+                c.Driver = null;
+                p.transform.SetParent(null, true);
+                p.transform.SetPositionAndRotation(c.DoorStand, Quaternion.Euler(0, c.transform.eulerAngles.y - 90, 0));
+                p.Pose = 0;
+                p.gameObject.AddComponent<WalkAway>();
+                Hud.Toast("Водитель вышел — машина ваша на время");
+            }
+            AudioFx.Play("door");
+        }
+
         static Vector3 Node(Vector2Int n) => new Vector3(n.x * City.P, 0.02f, n.y * City.P);
         static bool Valid(Vector2Int n) => n.x >= 0 && n.y >= 0 && n.x <= City.N && n.y <= City.N;
 
@@ -65,6 +84,10 @@ namespace Gad
             }
             if (drivers.Count < Gfx.TrafficCars && City.InCity(me) || drivers.Count < Gfx.TrafficCars / 2) TrySpawnCar(me);
             foreach (var d in drivers) Drive(d, dt, me);
+
+            // taken cars left far behind disappear
+            foreach (var c in Car.Live.ToArray())
+                if (c != null && !c.Traffic && c.OwnedIndex < 0 && c != PlayerCtl.I.Car && (c.transform.position - me).sqrMagnitude > 350f * 350f) Destroy(c.gameObject);
 
             // pedestrians
             for (int i = walkers.Count - 1; i >= 0; i--)
@@ -220,8 +243,8 @@ namespace Gad
             var w = new Walker { bx = bx, bz = bz, s = Random.Range(0, Loop), dir = Random.value < 0.5f ? 1 : -1, speed = Random.Range(1.1f, 1.6f) };
             var p = WalkPos(bx, bz, w.s, out _);
             if ((p - me).sqrMagnitude < 20f * 20f) return;
-            var look = new Look { gender = Random.Range(0, 2), skin = Random.Range(0, 5), hair = Random.Range(0, 6), hairStyle = Random.Range(0, 4), shirt = Random.Range(0, 14), pants = Random.Range(0, 14), shoes = Random.Range(0, 14), top = Random.Range(0, 4), hat = Random.value < 0.2f ? 1 : 0, height = Random.Range(0.93f, 1.06f) };
-            w.h = Human.Create(root, look, "Pedestrian");
+            var look = Person.Random(new Rng((uint)Random.Range(1, int.MaxValue)));
+            w.h = Person.Create(root, look, "Pedestrian", false, Random.Range(1.62f, 1.9f));
             w.h.transform.position = p;
             walkers.Add(w);
         }
@@ -241,6 +264,21 @@ namespace Gad
             var want = Quaternion.LookRotation(d2 * w.dir);
             w.h.transform.rotation = Quaternion.RotateTowards(w.h.transform.rotation, want, 360 * dt);
             w.h.Speed = sp;
+        }
+    }
+
+    /// <summary>A driver who left their car walks off and disappears.</summary>
+    public class WalkAway : MonoBehaviour
+    {
+        float t;
+        Person p;
+        void Start() { p = GetComponent<Person>(); }
+        void Update()
+        {
+            t += Time.deltaTime;
+            transform.position += transform.forward * 1.5f * Time.deltaTime;
+            if (p != null) p.Speed = 1.5f;
+            if (t > 9f) Destroy(gameObject);
         }
     }
 }

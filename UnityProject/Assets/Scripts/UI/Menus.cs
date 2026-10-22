@@ -25,7 +25,7 @@ namespace Gad
                 w.Row("Карта города и GPS", "Найти автосалон, работу, дом…", "КАРТА", Blue, Map);
                 w.Row("Чат и игроки онлайн", "Сейчас в мире: " + (WorldNet.OnlineCount + 1) + " (вы + другие игроки)", "ЧАТ", Blue, Chat);
                 w.Row("Такси (быстро)", "Перенестись в любое место города за $60", "ВЫБРАТЬ", Orange, () => Travel(null));
-                w.Row("Внешность", "Переодеться можно дома (гардероб) или купить одежду в магазине", "ДОМА", Grey, () => Hud.Toast("Гардероб — у вас дома или в магазине одежды"));
+                w.Row("Скины", "Готовые образы: бизнесмен, киберпанк, инопланетянин…", "СКИНЫ", new Color(0.55f, 0.3f, 0.9f), Skins);
                 w.Row("Настройки", "Графика, звук, имя", "ОТКРЫТЬ", Grey, Settings);
             });
         }
@@ -116,24 +116,118 @@ namespace Gad
                         if (z.level < 5) w.Row("Улучшить бизнес", "+60% дохода · " + Hud.Money(Eco.UpgradeCost(b, z)), "УЛУЧШИТЬ", Orange, () => { Eco.Upgrade(b); Window.Refresh(); });
                     }
                 }
-                if (b.IsHome && b.Units > 1) w.Row("Квартиры в этом доме", "", "СМОТРЕТЬ", Blue, () => Flats(b));
+                if (b.type == BType.Apartment || b.type == BType.Tower) w.Row("Квартиры в этом доме", "", "СМОТРЕТЬ", Blue, () => Flats(b));
             });
         }
 
         // ------------------------------------------------------------------ property
 
+        /// <summary>The lift's panel: one button per floor.</summary>
+        public static void Lift(Bld b, Elevator lift)
+        {
+            Window.Show("ЛИФТ · " + b.name.ToUpper(), w =>
+            {
+                int top = Interiors.TopFloor(b);
+                w.Text("Сейчас: " + Elevator.FloorName(lift.Floor) + ". Выберите этаж:", 26, UIKit.Muted);
+                var chips = new List<(string, Color, bool, System.Action)>();
+                for (int f = 0; f <= top; f++)
+                {
+                    int fl = f;
+                    string label = f == 0 ? "Лобби" : (f + 1).ToString();
+                    if (b.type == BType.Agency && f == top) label = "Lounge";
+                    bool mine = Save.D.homes.Exists(h => h.building == b.id && h.unit / 10 == f);
+                    chips.Add((label, mine ? new Color(0.15f, 0.6f, 0.3f) : new Color(0.2f, 0.25f, 0.35f), f == lift.Floor, () => { Window.Close(); lift.Go(fl); }));
+                }
+                w.Chips("Этажи (зелёный — там ваша квартира)", chips);
+            }, 1180, 720);
+        }
+
+        /// <summary>The concierge: every flat in this building, by floor.</summary>
         public static void Flats(Bld b)
         {
             Window.Show(b.name.ToUpper() + " · КВАРТИРЫ", w =>
             {
-                int n = Mathf.Min(b.Units, 16);
-                w.Text(b.type == BType.Tower ? "Пентхаусы и апартаменты с видом на город" : "Выберите квартиру. Свою можно обустроить и спать в ней.", 24, UIKit.Muted);
-                for (int u = 1; u <= n; u++)
+                w.Text("На каждом этаже 5 квартир. Свободные можно осмотреть и купить, свою — обустроить. Поднимайтесь на лифте!", 24, UIKit.Muted);
+                int top = Interiors.TopFloor(b);
+                for (int f = 1; f <= top; f++)
+                    for (int k = 1; k <= 5; k++)
+                    {
+                        int unit = f * 10 + k;
+                        int st = Interiors.FlatStatus(b, unit);
+                        if (st == 0) continue;
+                        int fl = f;
+                        w.Row(((b.type == BType.Tower) ? "Апартаменты " : "Квартира ") + ((f + 1) * 100 + k) + (st == 2 ? "  (МОЯ)" : ""),
+                              $"{f + 1} этаж · {(st == 2 ? "ваша" : Hud.Money(b.UnitPrice(unit)))}", "НА ЭТАЖ", st == 2 ? Green : Blue, () =>
+                        {
+                            Window.Close();
+                            Hud.FadeThrough(() =>
+                            {
+                                var lift = Elevator.I;
+                                if (lift != null) { Object.Destroy(lift.gameObject); }
+                                Interiors.Enter(b, fl);
+                            }, 2.5f);
+                        });
+                    }
+            });
+        }
+
+        /// <summary>Real-estate agency: every home in the city for sale.</summary>
+        public static void RealEstate()
+        {
+            int tab = 0;
+            Window.Show("ГАД СИТИ · НЕДВИЖИМОСТЬ", w =>
+            {
+                var tabs = new List<(string, Color, bool, System.Action)>
                 {
-                    int unit = u;
-                    bool own = Eco.OwnsHome(b.id, u);
-                    int floor = b.type == BType.Tower ? Mathf.Max(2, b.floors - n + u) : 1 + (u - 1) / 4;
-                    w.Row((b.type == BType.Tower ? "Апартаменты " : "Квартира ") + u + (own ? "  (МОЯ)" : ""), $"{floor} этаж · {Hud.Money(b.UnitPrice(u))}", own ? "ДОМОЙ" : "СМОТРЕТЬ", own ? Green : Blue, () => { Window.Close(); Interiors.Enter(b, unit); });
+                    ("Квартиры", Blue, tab == 0, () => { tab = 0; Window.Refresh(); }),
+                    ("Пентхаусы", Blue, tab == 1, () => { tab = 1; Window.Refresh(); }),
+                    ("Дома", Blue, tab == 2, () => { tab = 2; Window.Refresh(); }),
+                    ("Виллы", Blue, tab == 3, () => { tab = 3; Window.Refresh(); }),
+                };
+                w.Chips("Что ищем?", tabs);
+                var type = tab switch { 0 => BType.Apartment, 1 => BType.Tower, 2 => BType.House, _ => BType.Villa };
+                var me = PlayerCtl.I.Inside >= 0 ? City.Get(PlayerCtl.I.Inside).door : PlayerCtl.I.transform.position;
+                var list = City.OfType(type);
+                list.Sort((x, y) => (x.door - me).sqrMagnitude.CompareTo((y.door - me).sqrMagnitude));
+                int shown = 0;
+                foreach (var bb in list)
+                {
+                    if (shown >= 25) break;
+                    var bld = bb;
+                    if (type == BType.Apartment || type == BType.Tower)
+                    {
+                        int free = 0, first = -1, top = Interiors.TopFloor(bb);
+                        for (int f = type == BType.Tower ? bb.floors / 2 + 1 : 1; f <= top; f++)
+                            for (int k = 1; k <= 5; k++) if (Interiors.FlatStatus(bb, f * 10 + k) == 1) { free++; if (first < 0) first = f * 10 + k; }
+                        if (free == 0) continue;
+                        int unit = first;
+                        w.Row(bb.name, $"{bb.address} · свободно {free} · от {Hud.Money(bb.UnitPrice(unit))}", "КУПИТЬ", Green, () =>
+                        {
+                            Window.Close();
+                            if (!Eco.Spend(bld.UnitPrice(unit), "Покупка через агентство")) return;
+                            Save.D.homes.Add(new OwnedHome { building = bld.id, unit = unit });
+                            Save.Write();
+                            Hud.SetGps(bld.door, bld.name);
+                            Hud.Toast($"Квартира {(unit / 10 + 1) * 100 + unit % 10} на {unit / 10 + 1} этаже — ваша! Маршрут проложен", new Color(0.5f, 1f, 0.6f));
+                        }, Save.D.money >= bb.UnitPrice(unit), MapTex.Cat(type));
+                    }
+                    else
+                    {
+                        bool own = Eco.OwnsHome(bb.id, 0);
+                        w.Row(bb.name + (own ? "  (ВАШ)" : ""), $"{bb.address} · {Hud.Money(bb.UnitPrice(0))}", own ? "GPS" : "КУПИТЬ", own ? Blue : Green, () =>
+                        {
+                            Window.Close();
+                            if (!own)
+                            {
+                                if (!Eco.Spend(bld.UnitPrice(0), "Покупка через агентство")) return;
+                                Save.D.homes.Add(new OwnedHome { building = bld.id, unit = 0 });
+                                Save.Write();
+                                Hud.Toast("Поздравляем с покупкой: " + bld.name + "!", new Color(0.5f, 1f, 0.6f));
+                            }
+                            Hud.SetGps(bld.door, bld.name);
+                        }, own || Save.D.money >= bb.UnitPrice(0), MapTex.Cat(type));
+                    }
+                    shown++;
                 }
             });
         }
@@ -378,7 +472,7 @@ namespace Gad
                         Window.Close();
                         Hud.FadeThrough(() =>
                         {
-                            if (PlayerCtl.I.Car != null) PlayerCtl.I.ExitCar();
+                            if (PlayerCtl.I.Car != null) PlayerCtl.I.ExitCarInstant();
                             if (PlayerCtl.I.Inside >= 0) { Interiors.Clear(); PlayerCtl.I.Inside = -1; Streamer.SetOutdoor(true); }
                             PlayerCtl.I.Teleport(b.ExitPoint + b.FrontDir * 2f, 0);
                             Streamer.ForceNear();
@@ -495,11 +589,18 @@ namespace Gad
 
         // ------------------------------------------------------------------ appearance
 
-        /// <summary>Character editor: free at home / at creation, paid in clothes shops.</summary>
-        public static void Wardrobe(bool paid, bool creation = false)
+        static readonly (Wardrobe.Slot slot, string name)[] Depts =
         {
-            var look = Save.D.look.Clone();
+            (Wardrobe.Slot.HGender, "Пол"), (Wardrobe.Slot.HSkin, "Кожа"), (Wardrobe.Slot.HHair, "Причёска"), (Wardrobe.Slot.HEyes, "Глаза"),
+            (Wardrobe.Slot.HMouth, "Лицо"), (Wardrobe.Slot.HTop, "Верх"), (Wardrobe.Slot.HBottom, "Низ"), (Wardrobe.Slot.HShoes, "Обувь"), (Wardrobe.Slot.HAcc, "Аксессуары"),
+        };
+
+        /// <summary>Character editor: free at home / at creation, paid in clothes shops.</summary>
+        public static void Dress(bool paid, bool creation = false)
+        {
+            var look = Save.D.skin.Clone();
             const int Price = 350;
+            int dept = creation ? 0 : 5;
             Window.Show(creation ? "СОЗДАНИЕ ПЕРСОНАЖА" : paid ? "МАГАЗИН ОДЕЖДЫ" : "ГАРДЕРОБ", w =>
             {
                 void Apply() { PlayerCtl.I.Body.Rebuild(look); Window.Refresh(); }
@@ -513,58 +614,80 @@ namespace Gad
                     input.onEndEdit.AddListener(s => Save.D.name = s.Trim());
                     input.onValueChanged.AddListener(s => Save.D.name = s.Trim());
                 }
-                w.Chips("Пол", new List<(string, Color, bool, System.Action)>
-                {
-                    ("Мужской", Grey, look.gender == 0, () => { look.gender = 0; Apply(); }),
-                    ("Женский", Grey, look.gender == 1, () => { look.gender = 1; if (look.hairStyle == 2) look.hairStyle = 1; Apply(); }),
-                });
-                Colors(w, "Кожа", Palette.Skin, look.skin, i => { look.skin = i; Apply(); });
-                w.Chips("Причёска", new List<(string, Color, bool, System.Action)>
-                {
-                    ("Короткая", Grey, look.hairStyle == 0, () => { look.hairStyle = 0; Apply(); }),
-                    ("Длинная", Grey, look.hairStyle == 1, () => { look.hairStyle = 1; Apply(); }),
-                    ("Лысый", Grey, look.hairStyle == 2, () => { look.hairStyle = 2; Apply(); }),
-                    ("Пучок", Grey, look.hairStyle == 3, () => { look.hairStyle = 3; Apply(); }),
-                });
-                Colors(w, "Цвет волос", Palette.Hair, look.hair, i => { look.hair = i; Apply(); });
-                w.Chips("Верх", new List<(string, Color, bool, System.Action)>
-                {
-                    ("Футболка", Grey, look.top == 0, () => { look.top = 0; Apply(); }),
-                    ("Куртка", Grey, look.top == 1, () => { look.top = 1; Apply(); }),
-                    ("Худи", Grey, look.top == 2, () => { look.top = 2; Apply(); }),
-                    ("Костюм", Grey, look.top == 3, () => { look.top = 3; Apply(); }),
-                });
-                Colors(w, "Цвет верха", Palette.Cloth, look.shirt, i => { look.shirt = i; Apply(); });
-                Colors(w, "Брюки", Palette.Cloth, look.pants, i => { look.pants = i; Apply(); });
-                Colors(w, "Обувь", Palette.Cloth, look.shoes, i => { look.shoes = i; Apply(); });
-                w.Chips("Головной убор", new List<(string, Color, bool, System.Action)>
-                {
-                    ("Нет", Grey, look.hat == 0, () => { look.hat = 0; Apply(); }),
-                    ("Кепка", Grey, look.hat == 1, () => { look.hat = 1; Apply(); }),
-                    ("Шапка", Grey, look.hat == 2, () => { look.hat = 2; Apply(); }),
-                });
                 string btn = creation ? "НАЧАТЬ ИГРУ" : paid ? "КУПИТЬ " + Hud.Money(Price) : "ГОТОВО";
-                w.Row(creation ? "Готово?" : "Сохранить образ", paid ? "Новый образ сохранится" : "", btn, Green, () =>
+                w.Row(creation ? "Готово?" : "Сохранить образ", creation ? "Готовые образы — в Телефон → Скины" : paid ? "Новый образ сохранится" : "", btn, Green, () =>
                 {
                     if (creation && (Save.D.name == null || Save.D.name.Length < 2)) { Hud.Toast("Введите имя (минимум 2 буквы)"); return; }
                     if (paid && !Eco.Spend(Price, "Новый образ")) return;
-                    Save.D.look = look.Clone();
+                    Save.D.skin = look.Clone();
                     if (creation) Save.D.created = true;
                     Save.Write();
-                    PlayerCtl.I.Body.Rebuild(Save.D.look);
+                    PlayerCtl.I.Body.Rebuild(Save.D.skin);
                     WorldNet.LookChanged();
                     Window.Close();
                     if (creation) Hud.Toast("Добро пожаловать в ГАД 2-2 X, " + Save.D.name + "!", UIKit.Cyan);
                 });
-            }, 1180, 860).OnClose = () => { if (PlayerCtl.I != null) PlayerCtl.I.Body.Rebuild(Save.D.look); if (creation && !Save.D.created) { Save.D.created = true; if (string.IsNullOrEmpty(Save.D.name)) Save.D.name = "Игрок" + Random.Range(100, 999); Save.Write(); } };
+                var tabs = new List<(string, Color, bool, System.Action)>();
+                for (int i = 0; i < Depts.Length; i++) { int k = i; tabs.Add((Depts[i].name, new Color(0.2f, 0.4f, 0.75f), dept == i, () => { dept = k; Window.Refresh(); })); }
+                w.Chips("Раздел", tabs);
+                var slot = Depts[dept].slot;
+                var items = new List<(string, Color, bool, System.Action)>();
+                foreach (var d in global::Gad.Wardrobe.OfSlot(slot))
+                {
+                    if (slot == global::Gad.Wardrobe.Slot.HTop && d.style == "kit") continue;
+                    if (slot == global::Gad.Wardrobe.Slot.HSkin && (d.style == "gold" || d.id == "hs_alien") && !creation && !Save.D.skins.Contains(d.id)) continue;
+                    var def = d;
+                    bool sel = look.Get(slot) == d.id;
+                    var col = d.none ? Grey : Color.Lerp(d.color, Grey, 0.15f);
+                    items.Add((d.name, col, sel, () => { look.Set(slot, def.id); if (slot == global::Gad.Wardrobe.Slot.HTop && def.style == "dress") look.hBottom = "hb_none"; Apply(); }));
+                }
+                w.Chips(Depts[dept].name, items);
+            }, 1180, 860).OnClose = () => { if (PlayerCtl.I != null) PlayerCtl.I.Body.Rebuild(Save.D.skin); if (creation && !Save.D.created) { Save.D.created = true; if (string.IsNullOrEmpty(Save.D.name)) Save.D.name = "Игрок" + Random.Range(100, 999); Save.Write(); } };
         }
 
-        static void Colors(Window w, string title, Color[] pal, int sel, System.Action<int> pick)
+        /// <summary>Ready-made looks: tap to wear (bought ones stay yours).</summary>
+        public static readonly (string id, string name, int price, SkinSet look)[] SkinPresets =
         {
-            var chips = new List<(string, Color, bool, System.Action)>();
-            for (int i = 0; i < pal.Length; i++) { int k = i; chips.Add(("", pal[i], sel % pal.Length == i, () => pick(k))); }
-            w.Chips(title, chips);
+            ("city", "Горожанин", 0, new SkinSet { hHair = "hh_short_brown", hTop = "ht_tee_white", hBottom = "hb_jeans_blue", hShoes = "hf_sneakers_white" }),
+            ("city_f", "Горожанка", 0, new SkinSet { hGender = "hg_f", hHair = "hh_long_brown", hEyes = "he_lashes", hMouth = "hm_lips", hTop = "ht_print_heart", hBottom = "hb_jeans_dark", hShoes = "hf_sneakers_white" }),
+            ("boss", "Бизнесмен", 1500, new SkinSet { hHair = "hh_short_black", hTop = "ht_suit_navy", hBottom = "hb_pants_navy", hShoes = "hf_shoes_black", hAcc = "ha_shades_gold", hMouth = "hm_smirk" }),
+            ("boss_f", "Бизнес-леди", 1500, new SkinSet { hGender = "hg_f", hHair = "hh_bun_black", hEyes = "he_lashes", hMouth = "hm_lips", hTop = "ht_suit_grey", hBottom = "hb_skirt_black", hShoes = "hf_shoes_black" }),
+            ("cyber", "Киберпанк", 2500, new SkinSet { hSkin = "hs_peach", hHair = "hh_mohawk_blue", hEyes = "he_angry", hTop = "ht_hoodie_black", hBottom = "hb_joggers_black", hShoes = "hf_hightop_black", hAcc = "ha_sunglasses" }),
+            ("cyber_f", "Неон-девушка", 2500, new SkinSet { hGender = "hg_f", hHair = "hh_ponytail_pink", hEyes = "he_big", hMouth = "hm_lips", hTop = "ht_hoodie_pink", hBottom = "hb_skirt_black", hShoes = "hf_sneakers_neon", hAcc = "ha_headphones_pink" }),
+            ("sport", "Спортсмен", 800, new SkinSet { hSkin = "hs_tan", hHair = "hh_buzz_black", hTop = "ht_tank_white", hBottom = "hb_shorts_black", hShoes = "hf_sneakers_red" }),
+            ("street", "Уличный стиль", 900, new SkinSet { hSkin = "hs_brown", hHair = "hh_afro_black", hTop = "ht_print_bolt", hBottom = "hb_cargo_khaki", hShoes = "hf_hightop_red", hAcc = "ha_headphones_black" }),
+            ("worker", "Рабочий", 300, new SkinSet { hHair = "hh_short_blonde", hMouth = "hm_beard", hTop = "ht_flannel_red", hBottom = "hb_cargo_olive", hShoes = "hf_boots_brown" }),
+            ("student", "Студентка", 600, new SkinSet { hGender = "hg_f", hHair = "hh_bangs_red", hEyes = "he_lashes", hMouth = "hm_smile", hTop = "ht_shirt_white", hBottom = "hb_skirt_plaid", hShoes = "hf_shoes_brown", hAcc = "ha_glasses_round" }),
+            ("kaz_man", "Казах в чапане", 3000, new SkinSet { hSkin = "hs_tan", hHair = "hh_short_black", hTop = "ht_chapan_blue", hBottom = "hb_pants_black", hShoes = "hf_sapogi_black", hAcc = "ha_kalpak" }),
+            ("kaz_girl", "Казашка в саукеле", 3000, new SkinSet { hGender = "hg_f", hSkin = "hs_tan", hHair = "hh_long_black", hEyes = "he_lashes", hMouth = "hm_lips", hTop = "ht_koylek", hBottom = "hb_none", hShoes = "hf_shoes_brown", hAcc = "ha_saukele" }),
+            ("alien", "Инопланетянин", 12000, new SkinSet { hSkin = "hs_alien", hHair = "hh_none", hEyes = "he_big", hMouth = "hm_open", hTop = "ht_tee_black", hBottom = "hb_joggers_black", hShoes = "hf_sneakers_neon" }),
+            ("gold", "Золотой человек", 50000, new SkinSet { hSkin = "hs_gold", hHair = "hh_none", hEyes = "he_happy", hTop = "ht_none", hBottom = "hb_none", hShoes = "hf_none" }),
+        };
+
+        public static void Skins()
+        {
+            Window.Show("СКИНЫ", w =>
+            {
+                w.Text("Готовые образы. Купленный скин остаётся вашим — надевайте в любой момент. Свой образ — в гардеробе дома или в магазине одежды.", 22, UIKit.Muted);
+                foreach (var p in SkinPresets)
+                {
+                    var preset = p;
+                    bool own = p.price == 0 || Save.D.skins.Contains(p.id);
+                    bool wearing = Save.D.skin.Encode() == p.look.Encode();
+                    w.Row(p.name + (wearing ? "  (надет)" : ""), own ? "Ваш скин" : "Цена " + Hud.Money(p.price), own ? "НАДЕТЬ" : "КУПИТЬ", own ? Green : Orange, () =>
+                    {
+                        if (!own) { if (!Eco.Spend(preset.price, "Скин: " + preset.name)) return; Save.D.skins.Add(preset.id); if (preset.look.hSkin == "hs_gold" || preset.look.hSkin == "hs_alien") Save.D.skins.Add(preset.look.hSkin); }
+                        Save.D.skin = preset.look.Clone();
+                        Save.Write();
+                        PlayerCtl.I.Body.Rebuild(Save.D.skin);
+                        WorldNet.LookChanged();
+                        Window.Refresh();
+                    }, true, Wardrobe_Color(p.look));
+                }
+            });
         }
+
+        static Color Wardrobe_Color(SkinSet s) => global::Gad.Wardrobe.Find(s.hTop)?.color ?? Grey;
 
         /// <summary>Furniture: buy and recolour items for a home.</summary>
         public static void Decor(OwnedHome home = null)

@@ -33,7 +33,9 @@ namespace Gad
             if (type == BType.Apartment) p += floors * 1200 + (int)(rect.width * rect.height * 4);
             if (type == BType.Villa || type == BType.House) p += (int)(rect.width * rect.height * 30);
             if (district == District.Downtown || district == District.Beach) p = p * 3 / 2;
-            if (unit > 0 && type == BType.Tower) p += unit * 25000;
+            int floor = unit / 10;
+            if (unit > 0 && type == BType.Tower) p = p / 3 + floor * 12000 + (unit % 10) * 1500;
+            if (unit > 0 && type == BType.Apartment) p += floor * 1500 + (unit % 10) * 300;
             return p / 100 * 100;
         }
 
@@ -116,6 +118,7 @@ namespace Gad
         /// <summary>Fixed places for the one-of-a-kind buildings (single = takes the whole block).</summary>
         static readonly Dictionary<(int, int), (BType type, bool single)> Fixed = new Dictionary<(int, int), (BType, bool)>
         {
+            [(7, 6)] = (BType.Agency, true),
             [(7, 5)] = (BType.Mall, true), [(4, 11)] = (BType.Mall, true),
             [(3, 5)] = (BType.Hospital, true), [(10, 9)] = (BType.Hospital, true),
             [(2, 8)] = (BType.FireStation, false), [(11, 6)] = (BType.FireStation, false),
@@ -209,6 +212,9 @@ namespace Gad
                 float h; int style;
                 switch (t)
                 {
+                    case BType.Agency:
+                        fp = Shrink(lot, front, 15, 3f, new Vector2(30, 30));
+                        h = 20 * 3.6f; style = 0; break;
                     case BType.Tower:
                         fp = Shrink(lot, front, r.F(2, 5), 1f, new Vector2(r.F(20, 26), r.F(24, 36)));
                         h = r.F(70, 180); style = r.Chance(0.5f) ? 0 : 7; break;
@@ -274,7 +280,7 @@ namespace Gad
             var b = new Bld
             {
                 id = All.Count, type = t, district = d, rect = fp, height = h, floors = floors, style = style, front = front, cx = bx, cz = bz,
-                roofHelipad = t == BType.Tower && r.Chance(0.4f),
+                roofHelipad = t == BType.Agency || t == BType.Tower && r.Chance(0.4f),
             };
             b.door = DoorOf(fp, front);
             NameIt(b);
@@ -294,6 +300,7 @@ namespace Gad
         {
             var info = b.Info;
             if (b.type == BType.House) b.name = "Дом " + (b.id % 97 + 1);
+            else if (b.type == BType.Agency) b.name = "ГАД Сити · Недвижимость";
             else b.name = H.Pick(info.Names, b.id, 77);
             if (b.cx >= 0)
             {

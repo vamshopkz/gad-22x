@@ -37,7 +37,7 @@ namespace Gad
     }
 
     /// <summary>Shared materials: copies of the URP materials made by ProjectSetup (Resources/Materials).</summary>
-    public static class Mats
+    public static partial class Mats
     {
         static Material lit, litT, litE, unlit, unlitT, partA;
         static readonly Dictionary<int, Material> colors = new Dictionary<int, Material>();
@@ -253,6 +253,28 @@ namespace Gad
                 col.Add(new Color32(255, 255, 255, 255));
             }
             foreach (var idx in mesh.triangles) t.Add(s + idx);
+        }
+
+        /// <summary>Adds a multi-material mesh (one material per submesh), transformed by m.</summary>
+        public void AddMulti(Mesh mesh, Matrix4x4 m, Material[] mats)
+        {
+            int s0 = v.Count;
+            var mv = mesh.vertices; var mn = mesh.normals; var mu = mesh.uv;
+            var nm = m.inverse.transpose;
+            for (int i = 0; i < mv.Length; i++)
+            {
+                v.Add(m.MultiplyPoint3x4(mv[i]));
+                n.Add(i < mn.Length ? nm.MultiplyVector(mn[i]).normalized : Vector3.up);
+                uv.Add(i < mu.Length ? mu[i] : Vector2.zero);
+                col.Add(new Color32(255, 255, 255, 255));
+            }
+            for (int s = 0; s < mesh.subMeshCount && s < mats.Length; s++)
+            {
+                var tri = mesh.GetTriangles(s);
+                if (tri.Length == 0 || mats[s] == null) continue;
+                var t = T(mats[s]);
+                foreach (var idx in tri) t.Add(s0 + idx);
+            }
         }
 
         public GameObject Build(string name, Transform parent, int layer = 0, bool shadows = true)

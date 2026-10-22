@@ -38,8 +38,16 @@ namespace Gad
             if (!Spend(b.UnitPrice(unit), "Покупка жилья")) return;
             Save.D.homes.Add(new OwnedHome { building = b.id, unit = unit });
             Save.Write();
-            Hud.Toast("Поздравляем! Теперь это ваш дом: " + b.name + (unit > 0 ? ", кв. " + unit : ""), new Color(0.5f, 1f, 0.6f));
-            Interiors.Enter(b, unit);
+            Hud.Toast("Поздравляем! Теперь это ваш дом: " + b.name + (unit > 0 ? ", кв. " + ((unit / 10 + 1) * 100 + unit % 10) : ""), new Color(0.5f, 1f, 0.6f));
+            var pl = PlayerCtl.I;
+            if (unit >= 10 && Interiors.Current == b && pl.Inside == b.id)
+            {
+                // stay where we are: redraw this floor so the flat becomes ours (door, sign, furniture)
+                var pos = pl.transform.position; float yaw = pl.transform.eulerAngles.y;
+                Interiors.BuildLevel(Interiors.Floor);
+                pl.Teleport(pos, yaw);
+            }
+            else if (unit == 0) Interiors.Enter(b, 0);
         }
 
         public static long IncomePerHour(Bld b, OwnedBiz z) => (long)(b.BizPrice * 0.002f * (1f + (z.level - 1) * 0.6f));

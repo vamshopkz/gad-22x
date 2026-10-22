@@ -11,7 +11,7 @@ namespace Gad
     {
         public static PlayerCtl I;
         public CharacterController CC;
-        public Human Body;
+        public Person Body;
         public Vector2 MoveInput;          // from the joystick (or keys)
         public bool RunHeld, JumpPressed, ActionPressed, CarPressed, BrakeHeld;
         public Car Car;                    // car being driven
@@ -38,7 +38,7 @@ namespace Gad
             p.CC = go.AddComponent<CharacterController>();
             p.CC.height = 1.8f; p.CC.radius = 0.32f; p.CC.center = new Vector3(0, 0.9f, 0);
             p.CC.stepOffset = 0.35f; p.CC.slopeLimit = 50f; p.CC.skinWidth = 0.04f;
-            p.Body = Human.Create(go.transform, Save.D.look, "Me");
+            p.Body = Person.Create(go.transform, Save.D.skin, "Me", true);
             var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
             p.Cam = camGo.AddComponent<Camera>();
             p.Cam.nearClipPlane = 0.15f;
@@ -62,8 +62,9 @@ namespace Gad
         {
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             Keys();
-            if (Car != null) DriveUpdate(dt);
-            else WalkUpdate(dt);
+            if (busy) { }
+            else if (Car != null) DriveUpdate(dt);
+            else if (CC.enabled) WalkUpdate(dt);
             FindAction();
             if (ActionPressed && ActionDo != null && !Frozen) ActionDo();
             if (CarPressed && !Frozen) CarButton();
@@ -129,8 +130,12 @@ namespace Gad
             PlanarSpeed = Mathf.Abs(Car.Speed);
         }
 
+        public static bool ShotCam;
+        public static Vector3 ShotPos, ShotLook;
+
         void LateUpdate()
         {
+            if (ShotCam) { Cam.transform.position = ShotPos; Cam.transform.LookAt(ShotLook); return; }
             float dt = Time.deltaTime;
             Yaw += LookDelta.x * 0.25f;
             Pitch = Mathf.Clamp(Pitch + LookDelta.y * 0.2f, -25f, 70f);
@@ -163,7 +168,8 @@ namespace Gad
 
         void FindAction()
         {
-            ActionLabel = null; ActionDo = null; CarLabel = null;
+            ActionLabel = null; ActionDo = null; CarLabel = null; nearCar = null; nearParked = null;
+            if (busy) return;
             if (Car != null) { CarLabel = "ВЫЙТИ"; return; }
             var p = transform.position;
             if (Inside >= 0)
@@ -172,64 +178,144 @@ namespace Gad
                 if (ap != null) { ActionLabel = ap.Label; ActionDo = ap.Act; }
                 return;
             }
-            var b = City.DoorNear(p, 3.2f);
-            if (b != null)
-            {
-                ActionLabel = "ВОЙТИ: " + b.name;
-                ActionDo = () => Interiors.Enter(b);
-            }
-            Car near = null; float nd = 4.5f;
+            // any car nearby can be taken: yours, parked, or one stopped in traffic
+            float nd = 3.2f;
             foreach (var c in Car.Live)
             {
-                if (c.Traffic) continue;
-                float d = Vector3.Distance(c.transform.position, p);
-                if (d < nd) { nd = d; near = c; }
+                if (c == null || (c.Traffic && Mathf.Abs(c.Speed) > 2.5f)) continue;
+                float d = Vector3.Distance(c.DoorStand, p);
+                if (d < nd) { nd = d; nearCar = c; }
             }
-            if (near != null) { CarLabel = "СЕСТЬ"; nearCar = near; }
+            var spot = Streamer.ParkedNear(p, nd);
+            if (spot != null) { nearParked = spot; nearCar = null; }
+            if (nearCar != null || nearParked != null) CarLabel = "ЗАЙТИ В МАШИНУ";
         }
         Car nearCar;
+        Streamer.ParkedCar nearParked;
+        bool busy;
 
         void CarButton()
         {
+            if (busy) return;
             if (Car != null) { ExitCar(); return; }
+            if (nearParked != null) { var c = Streamer.TakeParked(nearParked); if (c != null) EnterCar(c); return; }
             if (nearCar != null) EnterCar(nearCar);
         }
 
-        public void EnterCar(Car c)
+        public void EnterCar(Car c, bool instant = false)
         {
             if (c.OwnedIndex >= 0 && c.OwnedIndex < Save.D.cars.Count && Save.D.cars[c.OwnedIndex].health <= 0)
             {
-                Hud.Toast("Машина сломана — вызовите эвакуатор в автомастерскую (Телефон → Гараж)");
+                Hud.Toast("Машина сломана — отремонтируйте в автомастерской (Телефон → Мои машины)");
                 return;
             }
+            if (c.Traffic) Gad.Traffic.TakeOver(c);
+            if (instant) { SitIn(c); c.DoorT = c.DoorTarget = 0; return; }
+            StartCoroutine(EnterSeq(c));
+        }
+
+        void SitIn(Car c)
+        {
             Car = c;
             CC.enabled = false;
-            Body.gameObject.SetActive(false);
+            Body.transform.SetParent(c.Seat, false);
+            Body.transform.localPosition = Vector3.zero;
+            Body.transform.localRotation = Quaternion.identity;
+            Body.Pose = 4; Body.Speed = 0; Body.Grounded = true;
             c.SetHeadlights(DayNight.IsNight);
-            AudioFx.Play("door");
             Yaw = c.transform.eulerAngles.y;
+        }
+
+        System.Collections.IEnumerator EnterSeq(Car c)
+        {
+            busy = true; Frozen = true;
+            CC.enabled = false;
+            // walk up to the door
+            var from = transform.position; var to = c.DoorStand; to.y = from.y;
+            var face = Quaternion.LookRotation(c.transform.right);
+            for (float t = 0; t < 1; t += Time.deltaTime / 0.35f)
+            {
+                transform.SetPositionAndRotation(Vector3.Lerp(from, to, t), Quaternion.Slerp(transform.rotation, face, t));
+                Body.Speed = 2f;
+                yield return null;
+            }
+            Body.Speed = 0;
+            c.DoorTarget = 1;
+            AudioFx.Play("door");
+            yield return new WaitForSeconds(0.45f);
+            // step in and sit down
+            var start = Body.transform.position;
+            Body.transform.SetParent(c.Seat, true);
+            var sp = Body.transform.localPosition; var sr = Body.transform.localRotation;
+            for (float t = 0; t < 1; t += Time.deltaTime / 0.45f)
+            {
+                Body.transform.localPosition = Vector3.Lerp(sp, Vector3.zero, t);
+                Body.transform.localRotation = Quaternion.Slerp(sr, Quaternion.identity, t);
+                if (t > 0.4f) Body.Pose = 4;
+                yield return null;
+            }
+            SitIn(c);
+            c.DoorTarget = 0;
+            yield return new WaitForSeconds(0.35f);
+            AudioFx.Play("door");
+            Frozen = false; busy = false;
         }
 
         public void ExitCar()
         {
+            if (Car == null || busy) return;
+            if (Mathf.Abs(Car.Speed) > 6f) { Hud.Toast("Сначала остановитесь"); return; }
+            StartCoroutine(ExitSeq(Car));
+        }
+
+        public void ExitCarInstant()
+        {
             if (Car == null) return;
             var c = Car;
-            if (Mathf.Abs(c.Speed) > 6f) { Hud.Toast("Сначала остановитесь"); return; }
-            c.Speed = 0; c.Input = Vector2.zero;
             Car = null;
-            var exit = c.SeatExit;
-            if (Physics.CheckCapsule(exit + Vector3.up * 0.4f, exit + Vector3.up * 1.6f, 0.3f, Car.SolidMask)) exit = c.transform.position + c.transform.right * (c.Dims.W / 2 + 0.9f) + Vector3.up * 0.3f;
-            Body.gameObject.SetActive(true);
-            Teleport(exit, c.transform.eulerAngles.y);
+            c.Speed = 0; c.Input = Vector2.zero; c.DoorT = c.DoorTarget = 0;
+            Body.transform.SetParent(transform, false);
+            Body.transform.localPosition = Vector3.zero; Body.transform.localRotation = Quaternion.identity;
+            Body.Pose = 0;
+            Teleport(c.DoorStand, c.transform.eulerAngles.y - 90);
             c.SetHeadlights(false);
+        }
+
+        System.Collections.IEnumerator ExitSeq(Car c)
+        {
+            busy = true; Frozen = true;
+            c.Speed = 0; c.Input = Vector2.zero;
+            c.DoorTarget = 1;
             AudioFx.Play("door");
+            yield return new WaitForSeconds(0.4f);
+            var stand = c.DoorStand;
+            if (Physics.CheckCapsule(stand + Vector3.up * 0.4f, stand + Vector3.up * 1.6f, 0.3f, Car.SolidMask & ~(1 << 9)))
+                stand = c.transform.position + c.transform.right * (c.Dims.W / 2 + 0.9f) + Vector3.up * 0.2f;
+            Car = null;
+            Body.Pose = 0;
+            var sp = Body.transform.position; var sr = Body.transform.rotation;
+            Body.transform.SetParent(transform, false);
+            transform.SetPositionAndRotation(stand, Quaternion.Euler(0, c.transform.eulerAngles.y - 90, 0));
+            for (float t = 0; t < 1; t += Time.deltaTime / 0.4f)
+            {
+                Body.transform.position = Vector3.Lerp(sp, stand, t);
+                Body.transform.rotation = Quaternion.Slerp(sr, transform.rotation, t);
+                yield return null;
+            }
+            Body.transform.localPosition = Vector3.zero; Body.transform.localRotation = Quaternion.identity;
+            Teleport(stand, c.transform.eulerAngles.y - 90);
+            c.SetHeadlights(false);
+            c.DoorTarget = 0;
+            yield return new WaitForSeconds(0.3f);
+            AudioFx.Play("door");
+            Frozen = false; busy = false;
         }
 
         /// <summary>Spawns (or moves) the player's own car on the nearest road.</summary>
         public Car CallCar(int index, Vector3 near)
         {
             if (index < 0 || index >= Save.D.cars.Count) return null;
-            if (Car != null) ExitCar();
+            if (Car != null) ExitCarInstant();
             if (MyCar != null) Destroy(MyCar.gameObject);
             var oc = Save.D.cars[index];
             var pos = City.NearestRoad(near, out float yaw);

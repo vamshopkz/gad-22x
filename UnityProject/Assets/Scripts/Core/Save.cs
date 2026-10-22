@@ -58,10 +58,12 @@ namespace Gad
     [Serializable]
     public class GameData
     {
-        public int version = 1;
+        public int version = 2;
         public string id;
         public string name = "";
         public Look look = new Look();
+        public SkinSet skin;
+        public List<string> skins = new List<string>();   // bought skin presets
         public long money = 5000;
         public long bank = 0;
         public float food = 80, energy = 90, health = 100;
@@ -97,6 +99,13 @@ namespace Gad
             if (D == null) D = new GameData();
             if (string.IsNullOrEmpty(D.id)) D.id = Guid.NewGuid().ToString("N").Substring(0, 10);
             if (D.look == null) D.look = new Look();
+            if (D.version < 2)
+            {
+                foreach (var h in D.homes)
+                    if (h.unit > 0 && h.unit < 10) h.unit = ((h.unit - 1) / 5 + 1) * 10 + (h.unit - 1) % 5 + 1;
+                D.version = 2;
+            }
+            if (D.skin == null || string.IsNullOrEmpty(D.skin.hGender)) D.skin = D.created ? Person.FromOld(D.look) : new SkinSet();
         }
 
         public static void Write()

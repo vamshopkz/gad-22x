@@ -22,16 +22,25 @@ namespace Gad
         public static readonly Vector3 O = new Vector3(0, -1000, 0);
         public static Transform Root;
         public static Bld Current;
-        public static int Unit;                 // flat number (0 = lobby / whole building)
+        public static int Unit;                 // floor (0 = ground floor / lobby)
+        public static int Floor => Unit;
+        static Transform Level, Ctr;
+        static int pointsFlushed;
+        public static float EX, EZ;             // lift position (same on every floor)
         public static readonly List<ActionPoint> Points = new List<ActionPoint>();
         static MeshB mb;
         static Rng rng;
         static float W, D, Hh;
 
         public static int Code => Current == null ? -1 : Current.id * 1000 + Unit;
+        public static bool HasLift(Bld b) => b.type == BType.Apartment || b.type == BType.Tower || b.type == BType.Office || b.type == BType.Hotel || b.type == BType.Agency;
+        public static int TopFloor(Bld b) => b.type == BType.Agency ? 19 : Mathf.Max(1, b.floors - 1);
 
         public static ActionPoint NearestPoint(Vector3 p, float max)
         {
+            var lift = Elevator.I;
+            if (lift != null && Root != null && !lift.Riding && lift.PlayerInside)
+                return new ActionPoint { Pos = p, Label = "ЛИФТ: ВЫБРАТЬ ЭТАЖ", Act = () => Menus.Lift(Current, lift) };
             ActionPoint best = null; float bd = max * max;
             foreach (var a in Points)
             {
@@ -47,9 +56,10 @@ namespace Gad
             if (pl.Inside < 0) { Save.D.px = pl.transform.position.x; Save.D.py = pl.transform.position.y; Save.D.pz = pl.transform.position.z; }
             Build(b, unit);
             pl.Inside = b.id;
-            pl.Teleport(O + new Vector3(0, 0.1f, 3f), 0);
+            if (unit > 0 && HasLift(b)) pl.Teleport(O + new Vector3(EX, unit * Elevator.FH + 0.1f, EZ - 2.6f), 180);
+            else pl.Teleport(O + new Vector3(0, 0.1f, 2.2f), 0);
             AudioFx.Play("door");
-            Hud.Toast(unit > 0 ? b.name + " · кв. " + unit : b.name);
+            Hud.Toast(b.name + (unit > 0 ? " · этаж " + (unit + 1) : ""));
             Streamer.SetOutdoor(false);
         }
 
@@ -69,17 +79,17 @@ namespace Gad
         public static void Clear()
         {
             if (Root != null) UnityEngine.Object.Destroy(Root.gameObject);
-            Root = null; Current = null; Unit = 0;
-            Points.Clear();
+            Root = null; Current = null; Unit = 0; Level = null; Ctr = null; Elevator.I = null;
+            Points.Clear(); pointsFlushed = 0;
         }
 
-        static void Point(Vector3 local, string label, Action act) => Points.Add(new ActionPoint { Pos = O + local, Label = label, Act = act });
+        static void Point(Vector3 local, string label, Action act) => Points.Add(new ActionPoint { Pos = Ctr.TransformPoint(local), Label = label, Act = act });
 
         // ------------------------------------------------------------------ building blocks
 
         static Material floorMat, wallMat;
 
-        static void Room(float w, float d, float h, Material floor, Color wall, bool windows = true)
+        static void Room(float w, float d, float h, Material floor, Color wall, bool windows = true, float dh = 1.4f, bool street = true, int lights = 2)
         {
             W = w; D = d; Hh = h;
             floorMat = floor;
@@ -89,9 +99,9 @@ namespace Gad
             mb.Box(Mats.Lit(wall * 0.8f), floor, new Vector3(-w / 2, -0.3f, 0), new Vector3(w / 2, 0, d), new Vector2(4, 4));
             mb.Box(wallMat, wallMat, new Vector3(-w / 2, h, 0), new Vector3(w / 2, h + 0.2f, d), new Vector2(4, 4), default, true, Mats.Lit(new Color(0.92f, 0.92f, 0.9f)));
             // walls (door gap in the south wall)
-            mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, -0.3f), new Vector3(-1.4f, h, 0), new Vector2(4, 4));
-            mb.Box(wallMat, wallMat, new Vector3(1.4f, 0, -0.3f), new Vector3(w / 2 + 0.3f, h, 0), new Vector2(4, 4));
-            mb.Box(wallMat, wallMat, new Vector3(-1.4f, 2.7f, -0.3f), new Vector3(1.4f, h, 0), new Vector2(4, 4));
+            mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, -0.3f), new Vector3(-dh, h, 0), new Vector2(4, 4));
+            mb.Box(wallMat, wallMat, new Vector3(dh, 0, -0.3f), new Vector3(w / 2 + 0.3f, h, 0), new Vector2(4, 4));
+            mb.Box(wallMat, wallMat, new Vector3(-dh, 2.7f, -0.3f), new Vector3(dh, h, 0), new Vector2(4, 4));
             mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, d), new Vector3(w / 2 + 0.3f, h, d + 0.3f), new Vector2(4, 4));
             mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, 0), new Vector3(-w / 2, h, d), new Vector2(4, 4));
             mb.Box(wallMat, wallMat, new Vector3(w / 2, 0, 0), new Vector3(w / 2 + 0.3f, h, d), new Vector2(4, 4));
@@ -99,8 +109,8 @@ namespace Gad
             var sk = Mats.Lit(wall * 0.6f);
             mb.Box(sk, sk, new Vector3(-w / 2, 0, d - 0.05f), new Vector3(w / 2, 0.12f, d), new Vector2(4, 4));
             // exit door: light rectangle with the street behind
-            mb.Box(Mats.Glow(new Color(0.75f, 0.85f, 0.95f)), null, new Vector3(-1.4f, 0, -0.32f), new Vector3(1.4f, 2.7f, -0.3f), new Vector2(4, 4));
-            mb.Box(Mats.Lit(new Color(0.2f, 0.2f, 0.22f)), null, new Vector3(-1.5f, 2.7f, -0.05f), new Vector3(1.5f, 2.85f, 0.05f), new Vector2(4, 4));
+            if (street) mb.Box(Mats.Glow(DayNight.IsNight ? new Color(0.12f, 0.14f, 0.25f) : new Color(0.75f, 0.85f, 0.95f)), null, new Vector3(-1.4f, 0, -0.62f), new Vector3(1.4f, 2.7f, -0.6f), new Vector2(4, 4));
+            mb.Box(Mats.Lit(new Color(0.2f, 0.2f, 0.22f)), null, new Vector3(-dh - 0.1f, 2.7f, -0.05f), new Vector3(dh + 0.1f, 2.85f, 0.05f), new Vector2(4, 4));
             if (windows)
             {
                 var glow = Mats.Glow(DayNight.IsNight ? new Color(0.08f, 0.1f, 0.2f) : new Color(0.65f, 0.82f, 0.98f));
@@ -120,18 +130,24 @@ namespace Gad
             Col(new Vector3(-w / 2 - 0.15f, h / 2, d / 2), new Vector3(0.3f, h, d), 10);
             Col(new Vector3(w / 2 + 0.15f, h / 2, d / 2), new Vector3(0.3f, h, d), 10);
             Col(new Vector3(0, h / 2, d + 0.15f), new Vector3(w, h, 0.3f), 10);
-            Col(new Vector3(0, h / 2, -0.4f), new Vector3(w, h, 0.3f), 10);
+            Col(new Vector3(-(w / 2 + dh) / 2, h / 2, -0.15f), new Vector3(w / 2 - dh, h, 0.3f), 10);
+            Col(new Vector3((w / 2 + dh) / 2, h / 2, -0.15f), new Vector3(w / 2 - dh, h, 0.3f), 10);
+            if (street) Col(new Vector3(0, h / 2, -0.7f), new Vector3(w, h, 0.3f), 10);
             Col(new Vector3(0, h + 0.1f, d / 2), new Vector3(w, 0.2f, d), 10);
             // lights
-            Light(new Vector3(0, h - 0.5f, d * 0.3f), Mathf.Max(w, d) * 0.9f, 1.3f);
-            Light(new Vector3(0, h - 0.5f, d * 0.75f), Mathf.Max(w, d) * 0.9f, 1.3f);
-            Point(new Vector3(0, 0, 0.6f), "ВЫЙТИ НА УЛИЦУ", Exit);
+            if (lights >= 2)
+            {
+                Light(new Vector3(0, h - 0.5f, d * 0.3f), Mathf.Max(w, d) * 0.9f, 1.3f);
+                Light(new Vector3(0, h - 0.5f, d * 0.75f), Mathf.Max(w, d) * 0.9f, 1.3f);
+            }
+            else if (lights == 1) Light(new Vector3(0, h - 0.5f, d * 0.5f), Mathf.Max(w, d) * 1.1f, 1.4f);
+            if (street) InteriorExit.Make(Ctr);
         }
 
         static void Light(Vector3 local, float range, float intensity)
         {
             var go = new GameObject("Light");
-            go.transform.SetParent(Root, false);
+            go.transform.SetParent(Ctr, false);
             go.transform.localPosition = local;
             var l = go.AddComponent<Light>();
             l.type = LightType.Point; l.range = range; l.intensity = intensity; l.color = new Color(1f, 0.96f, 0.9f);
@@ -141,7 +157,7 @@ namespace Gad
         static void Col(Vector3 c, Vector3 s, int layer)
         {
             var go = new GameObject("Col") { layer = layer };
-            go.transform.SetParent(Root, false);
+            go.transform.SetParent(Ctr, false);
             go.transform.localPosition = c;
             go.AddComponent<BoxCollider>().size = s;
         }
@@ -162,12 +178,14 @@ namespace Gad
         static void Mesh(PrimitiveType t, Vector3 pos, Vector3 scale, Color c, float yaw = 0)
             => mb.Add(Prim.MeshOf(t), Matrix4x4.TRS(pos, Quaternion.Euler(0, yaw, 0), scale), Mats.Lit(c));
 
-        static Human Npc(Vector3 local, float yaw, int seed, int pose = 0, int top = -1)
+        static Person Npc(Vector3 local, float yaw, int seed, int pose = 0, int top = -1)
         {
-            var r = new Rng((uint)seed);
-            var look = new Look { gender = r.I(2), skin = r.I(5), hair = r.I(6), hairStyle = r.I(4), shirt = r.I(14), pants = r.I(14), shoes = r.I(14), top = top >= 0 ? top : r.I(3), hat = 0 };
-            if (look.gender == 1 && look.hairStyle == 2) look.hairStyle = 1;
-            var h = Human.Create(Root, look, "Staff");
+            var r = new Rng((uint)seed * 2654435761u + 7);
+            var look = Person.Random(r);
+            if (top == 3) { look.hTop = r.Chance(0.5f) ? "ht_suit_navy" : "ht_suit_grey"; look.hBottom = "hb_pants_black"; look.hShoes = "hf_shoes_black"; }
+            if (top == 1) { look.hTop = "ht_flannel_blue"; if (Wardrobe.Find(look.hTop) == null) look.hTop = "ht_tee_grey"; look.hBottom = "hb_cargo_olive"; look.hShoes = "hf_boots_black"; }
+            var h = Person.Create(Ctr, look, "Staff");
+            if (pose == 2 && top == 3) pose = 5;
             h.transform.localPosition = local;
             h.transform.localRotation = Quaternion.Euler(0, yaw, 0);
             h.Pose = pose;
@@ -260,7 +278,7 @@ namespace Gad
         static void Sign(Vector3 local, string text, Color col, float size = 3f, float yaw = 0)
         {
             var go = new GameObject("Sign");
-            go.transform.SetParent(Root, false);
+            go.transform.SetParent(Ctr, false);
             go.transform.localPosition = local;
             go.transform.localRotation = Quaternion.Euler(0, yaw, 0);
             var t = go.AddComponent<TMPro.TextMeshPro>();
@@ -276,10 +294,9 @@ namespace Gad
         static void DisplayCar(Vector3 c, float yaw, CarDef def, int color)
         {
             var xf = Matrix4x4.TRS(c, Quaternion.Euler(0, yaw, 0), Vector3.one);
-            CarModel.Body(mb, xf, def.Shape, Palette.Get(Palette.Car, color), def.Id == "taxi");
-            CarModel.Wheels(mb, xf, def.Shape);
-            var d = CarModel.Of(def.Shape);
-            Col(c + Vector3.up * 0.8f, Quaternion.Euler(0, yaw, 0) * new Vector3(d.W, 1.6f, d.L) is var v ? new Vector3(Mathf.Abs(v.x), 1.6f, Mathf.Abs(v.z)) : Vector3.one, 12);
+            mb.AddMulti(CarMesh.Static(def, 0), xf, CarMesh.Materials(Car.ColorOf(def, color), def.Spec));
+            var r = Quaternion.Euler(0, yaw, 0) * new Vector3(def.W, 1.5f, def.L);
+            Col(c + Vector3.up * 0.8f, new Vector3(Mathf.Abs(r.x), 1.5f, Mathf.Abs(r.z)), 12);
         }
 
         // ------------------------------------------------------------------ layouts
@@ -287,18 +304,45 @@ namespace Gad
         public static void Build(Bld b, int unit)
         {
             Clear();
-            Current = b; Unit = unit;
+            Current = b;
             Root = new GameObject("Interior " + b.name).transform;
             Root.position = O;
+            var ls = LobbySize(b);
+            EX = ls.x / 2 - 2.2f; EZ = ls.y - 1.25f;
+            if (HasLift(b)) Elevator.Make(Root, b, unit, new Vector3(EX, 0, EZ));
+            BuildLevel(unit);
+        }
+
+        static Vector2 LobbySize(Bld b) => b.type switch
+        {
+            BType.Apartment or BType.Tower => new Vector2(14, 12),
+            BType.Hotel => new Vector2(18, 14),
+            BType.Agency => new Vector2(30, 22),
+            _ => new Vector2(22, 16),
+        };
+
+        /// <summary>Builds one floor of the current building (0 = ground floor), replacing the previous one.</summary>
+        public static void BuildLevel(int floor)
+        {
+            var b = Current;
+            if (Level != null) UnityEngine.Object.Destroy(Level.gameObject);
+            Points.Clear(); pointsFlushed = 0;
+            Unit = floor;
+            Level = new GameObject("Level " + floor).transform;
+            Level.SetParent(Root, false);
+            Level.localPosition = Vector3.up * floor * Elevator.FH;
+            Ctr = Level;
             mb = new MeshB();
-            rng = new Rng(H.U(b.id, unit, 31));
+            rng = new Rng(H.U(b.id, floor, 31));
+            int unit = 0;
+            if (floor > 0 && HasLift(b)) { UpperFloor(b, floor); return; }
             var accent = b.Info.Sign;
             var tiles = Mats.Tex(Tex.Tiles("floortile", new Color(0.86f, 0.85f, 0.82f), new Color(0.7f, 0.7f, 0.68f), 4), Color.white, 0.5f);
             var dark = Mats.Tex(Tex.Tiles("darkfloor", new Color(0.3f, 0.3f, 0.32f), new Color(0.22f, 0.22f, 0.24f), 2), Color.white, 0.6f);
             var concrete = WorldBuilder.Concrete;
             var wood = WorldBuilder.Wood;
 
-            bool homeView = unit > 0 || ((b.type == BType.House || b.type == BType.Villa) && Eco.OwnsHome(b.id, 0));
+            bool homeView = (b.type == BType.House || b.type == BType.Villa) && Eco.OwnsHome(b.id, 0);
             if (homeView) { Home(b, unit); Finish(b); return; }
 
             switch (b.type)
@@ -308,14 +352,11 @@ namespace Gad
                     Room(14, 12, 4f, b.type == BType.Tower ? dark : tiles, new Color(0.88f, 0.86f, 0.8f));
                     Counter(new Vector3(-4, 0, 6), 3, new Color(0.3f, 0.25f, 0.2f));
                     Npc(new Vector3(-4, 0, 7f), 180, b.id, 0, 3);
-                    BoxM(new Vector3(3, 0, 11.6f), new Vector3(6, 3, 12f), WorldBuilder.Metal);
-                    Box(new Vector3(4.45f, 0, 11.55f), new Vector3(4.55f, 3f, 11.6f), new Color(0.1f, 0.1f, 0.1f));
                     for (int i = 0; i < 4; i++) Box(new Vector3(6.6f, 1 + i * 0.3f, 2 + i * 0.01f), new Vector3(6.9f, 1.25f + i * 0.3f, 5), new Color(0.6f, 0.55f, 0.45f));
                     Sofa(new Vector3(-4, 0, 2.5f), 90, new Color(0.3f, 0.35f, 0.45f));
                     Plant(new Vector3(6, 0, 1));
-                    Sign(new Vector3(4.5f, 3.4f, 11.5f), "ЛИФТ", Color.white, 3);
-                    Point(new Vector3(4.5f, 0, 10.5f), "ЛИФТ: КВАРТИРЫ", () => Menus.Flats(b));
-                    Point(new Vector3(-4, 0, 5f), "КОНСЬЕРЖ", () => Menus.Flats(b));
+                    Sign(new Vector3(EX, 3.4f, 11.85f), "ЛИФТ", Color.white, 3);
+                    Point(new Vector3(-4, 0, 5f), "КОНСЬЕРЖ: КВАРТИРЫ", () => Menus.Flats(b));
                     if (b.type == BType.Tower) Point(new Vector3(0, 0, 10.5f), "ОФИСЫ: РАБОТА И БИЗНЕС", () => Menus.Building(b));
                     break;
 
@@ -368,7 +409,7 @@ namespace Gad
                     // shop fronts along the walls
                     (string title, Color col, Action act)[] stores =
                     {
-                        ("ОДЕЖДА", new Color(0.9f, 0.3f, 0.6f), () => Menus.Wardrobe(true)),
+                        ("ОДЕЖДА", new Color(0.9f, 0.3f, 0.6f), () => Menus.Dress(true)),
                         ("МЕБЕЛЬ", new Color(0.6f, 0.45f, 0.3f), () => Menus.Decor()),
                         ("ФУДКОРТ", new Color(0.95f, 0.5f, 0.1f), () => Menus.Food(b, FoodDef.Cafe)),
                         ("ПРОДУКТЫ", new Color(0.2f, 0.6f, 0.3f), () => Menus.Food(b, FoodDef.Shop)),
@@ -540,7 +581,7 @@ namespace Gad
                     Npc(new Vector3(-1, 0, 10), 180, b.id, 0, 3);
                     Sofa(new Vector3(-6, 0, 4), 90, new Color(0.55f, 0.15f, 0.2f));
                     Sofa(new Vector3(6, 0, 4), 270, new Color(0.55f, 0.15f, 0.2f));
-                    Plant(new Vector3(-7.5f, 0, 12)); Plant(new Vector3(7.5f, 0, 12));
+                    Plant(new Vector3(-7.5f, 0, 12)); Plant(new Vector3(-7.5f, 0, 2));
                     Point(new Vector3(0, 0, 7.8f), "РЕСЕПШН: НОМЕР", () => Menus.Hotel(b));
                     Sign(new Vector3(0, 3.8f, D - 0.4f), b.name, new Color(0.9f, 0.75f, 0.3f), 5);
                     break;
@@ -566,7 +607,7 @@ namespace Gad
                     }
                     Box(new Vector3(5, 0, 10.5f), new Vector3(7, 2.4f, 10.6f), new Color(0.8f, 0.9f, 0.95f));
                     Npc(new Vector3(-6, 0, 10), 150, b.id, 0);
-                    Point(new Vector3(0, 0, 3.5f), "ПРИМЕРОЧНАЯ: КУПИТЬ ОДЕЖДУ", () => Menus.Wardrobe(true));
+                    Point(new Vector3(0, 0, 3.5f), "ПРИМЕРОЧНАЯ: КУПИТЬ ОДЕЖДУ", () => Menus.Dress(true));
                     break;
 
                 case BType.Furniture:
@@ -617,6 +658,45 @@ namespace Gad
                     break;
                 }
 
+                case BType.Agency:
+                {
+                    var marble = Mats.Tex(Tex.Tiles("marble", new Color(0.9f, 0.88f, 0.85f), new Color(0.75f, 0.72f, 0.7f), 2), Color.white, 0.85f);
+                    Room(30, 22, 7f, marble, new Color(0.1f, 0.12f, 0.16f));
+                    // glowing property ads along the walls
+                    for (int k = 0; k < 4; k++)
+                    {
+                        float z = 4 + k * 4.2f;
+                        BoxM(new Vector3(-14.9f, 1.4f, z - 1.6f), new Vector3(-14.85f, 3.6f, z + 1.6f), Mats.Glow(Color.Lerp(new Color(0.15f, 0.5f, 0.9f), new Color(0.9f, 0.3f, 0.7f), k / 3f)));
+                        Sign(new Vector3(-14.8f, 2.5f, z), k switch { 0 => "ПЕНТХАУСЫ\nот $260 000", 1 => "ВИЛЛЫ У МОРЯ\nот $600 000", 2 => "КВАРТИРЫ\nот $35 000", _ => "ДОМА\nот $90 000" }, Color.white, 2.2f, 90);
+                    }
+                    // a model of the whole city in the middle of the hall
+                    var tableTop = new Vector3(2, 0.9f, 10);
+                    Box(tableTop + new Vector3(-3.3f, -0.9f, -3.3f), tableTop + new Vector3(3.3f, 0, 3.3f), new Color(0.08f, 0.09f, 0.12f), true, 0.8f);
+                    BoxM(tableTop + new Vector3(-3.1f, 0, -3.1f), tableTop + new Vector3(3.1f, 0.01f, 3.1f), Mats.Glow(new Color(0.05f, 0.15f, 0.25f)));
+                    float k2 = 6.0f / City.Size;
+                    foreach (var cb in City.All)
+                    {
+                        if (cb.cx < 0) continue;
+                        var mn = new Vector3((cb.rect.xMin - City.Size / 2) * k2, 0.01f, (cb.rect.yMin - City.Size / 2) * k2);
+                        var mx = new Vector3((cb.rect.xMax - City.Size / 2) * k2, 0.01f + cb.height * k2 * 2.5f, (cb.rect.yMax - City.Size / 2) * k2);
+                        BoxM(tableTop + mn, tableTop + mx, cb.type == BType.Agency ? Mats.Glow(new Color(0.2f, 0.95f, 1f)) : Mats.Lit(MapTex.Cat(cb.type), 0.6f));
+                    }
+                    for (int k = 0; k < 3; k++)
+                    {
+                        Counter(new Vector3(-8 + k * 8, 0, 17.5f), 4, new Color(0.12f, 0.14f, 0.2f));
+                        Npc(new Vector3(-8 + k * 8, 0, 18.6f), 180, b.id + k, 0, 3);
+                        BoxM(new Vector3(-9.2f + k * 8, 1.1f, 17.6f), new Vector3(-8.4f + k * 8, 1.6f, 17.65f), Mats.Glow(new Color(0.3f, 0.6f, 1f)));
+                    }
+                    Sofa(new Vector3(9, 0, 4), 270, new Color(0.9f, 0.9f, 0.92f)); Sofa(new Vector3(-6, 0, 4), 90, new Color(0.9f, 0.9f, 0.92f));
+                    for (int k = 0; k < 4; k++) Npc(new Vector3(-4 + k * 3, 0, 6 + (k % 2) * 2), k * 90, b.id + 40 + k, 0);
+                    Plant(new Vector3(-13.5f, 0, 20.5f), 1.4f); Plant(new Vector3(13.5f, 0, 1.5f), 1.4f);
+                    Sign(new Vector3(0, 5.6f, 21.8f), "ГАД СИТИ · НЕДВИЖИМОСТЬ", new Color(0.2f, 0.9f, 1f), 7);
+                    Sign(new Vector3(EX, 3.4f, 21.85f), "ЛИФТ · 20 ЭТАЖЕЙ", Color.white, 2.5f);
+                    for (int k = 0; k < 3; k++) Point(new Vector3(-8 + k * 8, 0, 16.2f), "АГЕНТ: КУПИТЬ ЖИЛЬЁ", () => Menus.RealEstate());
+                    Point(new Vector3(2, 0, 6), "МАКЕТ ГОРОДА: ВСЁ ЖИЛЬЁ", () => Menus.RealEstate());
+                    break;
+                }
+
                 case BType.Office:
                 default:
                     Room(22, 16, 3.6f, Mats.Tex(Tex.Tiles("carpet", new Color(0.35f, 0.4f, 0.5f), new Color(0.32f, 0.37f, 0.47f), 2), Color.white, 0.05f), new Color(0.92f, 0.93f, 0.95f));
@@ -648,29 +728,182 @@ namespace Gad
             var job = JobDef.Get(Save.D.job);
             if (job != null && job.Kind == 0 && job.Where == b.type && Unit == 0)
                 Point(new Vector3(W / 2 - 1.5f, 0, 1.5f), "НАЧАТЬ СМЕНУ: " + job.Title.ToUpper(), () => Work.StartShift(job, b));
-            var go = mb.Build("Interior mesh", Root, 12, true);
+            Flush();
+        }
+
+        /// <summary>Builds the merged mesh of the current container and the floor markers of its new action points.</summary>
+        static void Flush()
+        {
+            var go = mb.Build("Interior mesh", Ctr, 12, true);
             go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            // markers on the floor under every action point
-            foreach (var p in Points)
+            for (int i = pointsFlushed; i < Points.Count; i++)
             {
-                var m = Prim.Make(PrimitiveType.Cylinder, Root, p.Pos - O + Vector3.up * 0.02f, new Vector3(0.9f, 0.01f, 0.9f), Mats.Glow(new Color(0.2f, 0.85f, 1f)), "Spot");
+                var m = Prim.Make(PrimitiveType.Cylinder, Level, Level.InverseTransformPoint(Points[i].Pos) + Vector3.up * 0.02f, new Vector3(0.9f, 0.01f, 0.9f), Mats.Glow(new Color(0.2f, 0.85f, 1f)), "Spot");
                 m.AddComponent<Pulse>();
             }
+            pointsFlushed = Points.Count;
+            mb = new MeshB();
         }
 
         // ------------------------------------------------------------------ homes
 
-        static void Home(Bld b, int unit)
+        static readonly string[] Owners =
+        {
+            "Айгерим Н.", "Ерлан К.", "Мария С.", "Даурен А.", "Олег П.", "Асель Т.", "Тимур Б.", "Наталья В.", "Арман Ж.", "Камила Р.",
+            "Сергей Л.", "Дина М.", "Бауыржан О.", "Алия Е.", "Максим Г.", "Жанна И.", "Нурлан С.", "Екатерина Д.", "Руслан Х.", "Мадина Ш.",
+        };
+
+        /// <summary>0 someone else's (locked), 1 for sale (open for viewing), 2 the player's.</summary>
+        public static int FlatStatus(Bld b, int unit) => Eco.OwnsHome(b.id, unit) ? 2 : H.R(100, b.id, unit, 5) < 35 ? 1 : 0;
+        public static string OwnerName(Bld b, int unit) => H.Pick(Owners, b.id, unit, 9);
+
+        static void UpperFloor(Bld b, int floor)
+        {
+            if (b.type == BType.Agency && floor >= 19) { OpenFloor(b, floor, true); return; }
+            bool office = b.type == BType.Office || b.type == BType.Agency || (b.type == BType.Tower && floor <= b.floors / 2);
+            if (office) { OpenFloor(b, floor, false); return; }
+            Corridor(b, floor, b.type == BType.Tower, b.type == BType.Hotel);
+        }
+
+        /// <summary>A corridor with five doors: every flat (hotel room) belongs to someone — maybe to you.</summary>
+        static void Corridor(Bld b, int floor, bool lux, bool hotel)
+        {
+            float cz0 = EZ - 4.6f, czN = EZ + 1.15f, x0 = EX - 17.7f, x1 = EX + 17.7f, h = 3.0f;
+            var carpet = lux ? Mats.Tex(Tex.Tiles("marble2", new Color(0.88f, 0.86f, 0.82f), new Color(0.74f, 0.72f, 0.7f), 2), Color.white, 0.8f)
+                             : Mats.Tex(Tex.Tiles("carpet2", new Color(0.45f, 0.2f, 0.22f), new Color(0.4f, 0.17f, 0.19f), 2), Color.white, 0.05f);
+            var wallM = Mats.Lit(lux ? new Color(0.92f, 0.92f, 0.9f) : new Color(0.9f, 0.86f, 0.78f), 0.15f);
+            var tile = new Vector2(4, 4);
+            mb.Box(wallM, carpet, new Vector3(x0, -0.3f, cz0), new Vector3(x1, 0, czN), tile);
+            mb.Box(wallM, wallM, new Vector3(x0, h, cz0), new Vector3(x1, h + 0.2f, czN), tile, default, true, Mats.Lit(new Color(0.95f, 0.95f, 0.93f)));
+            mb.Box(wallM, wallM, new Vector3(x0 - 0.3f, 0, czN), new Vector3(x1 + 0.3f, h, czN + 0.3f), tile);
+            mb.Box(wallM, wallM, new Vector3(x0 - 0.3f, 0, cz0 - 0.3f), new Vector3(x0, h, czN), tile);
+            mb.Box(wallM, wallM, new Vector3(x1, 0, cz0 - 0.3f), new Vector3(x1 + 0.3f, h, czN), tile);
+            var glow = Mats.Glow(DayNight.IsNight ? new Color(0.1f, 0.12f, 0.25f) : new Color(0.65f, 0.82f, 0.98f));
+            mb.Box(glow, null, new Vector3(x0 + 0.01f, 0.9f, cz0 + 0.8f), new Vector3(x0 + 0.02f, 2.5f, czN - 0.8f), tile);
+            mb.Box(glow, null, new Vector3(x1 - 0.02f, 0.9f, cz0 + 0.8f), new Vector3(x1 - 0.01f, 2.5f, czN - 0.8f), tile);
+            var lamp = Mats.Glow(new Color(1f, 0.96f, 0.85f));
+            for (float x = x0 + 2; x < x1 - 1; x += 4) mb.Box(lamp, lamp, new Vector3(x - 0.3f, h - 0.04f, cz0 + 1.2f), new Vector3(x + 0.3f, h, cz0 + 1.8f), new Vector2(1, 1));
+            Col(new Vector3(EX, -0.15f, (cz0 + czN) / 2), new Vector3(x1 - x0 + 1, 0.3f, czN - cz0 + 1), 13);
+            Col(new Vector3(EX, h / 2, czN + 0.15f), new Vector3(x1 - x0, h, 0.3f), 10);
+            Col(new Vector3(x0 - 0.15f, h / 2, (cz0 + czN) / 2), new Vector3(0.3f, h, czN - cz0), 10);
+            Col(new Vector3(x1 + 0.15f, h / 2, (cz0 + czN) / 2), new Vector3(0.3f, h, czN - cz0), 10);
+            Col(new Vector3(EX, h + 0.1f, (cz0 + czN) / 2), new Vector3(x1 - x0, 0.2f, czN - cz0), 10);
+            for (int k = -1; k <= 1; k++) Light(new Vector3(EX + k * 11, h - 0.4f, cz0 + 1.6f), 12f, 1.1f);
+            Plant(new Vector3(x0 + 1, 0, czN - 0.8f)); Plant(new Vector3(x1 - 1, 0, czN - 0.8f));
+            Sign(new Vector3(EX + 2.6f, 2.2f, czN - 0.05f), "ЭТАЖ " + (floor + 1), lux ? new Color(0.85f, 0.7f, 0.3f) : Color.white, 3, 180);
+            Flush();
+
+            for (int k = 0; k < 5; k++)
+            {
+                float xk = EX + (k - 2) * 7f;
+                int unit = floor * 10 + k + 1;
+                int st = FlatStatus(b, unit);
+                if (hotel) st = Eco.OwnsHome(b.id, unit) ? 2 : H.R(100, b.id, unit, 6) < 45 ? 1 : 0;
+                string who = st == 2 ? (hotel ? "ВАШ НОМЕР" : "ВЫ") : st == 1 ? (hotel ? "СВОБОДЕН" : "ПРОДАЁТСЯ") : (hotel ? "ЗАНЯТ" : OwnerName(b, unit));
+                var col = st == 2 ? new Color(0.3f, 1f, 0.5f) : st == 1 ? new Color(1f, 0.8f, 0.25f) : new Color(0.9f, 0.9f, 0.9f);
+                string num = (hotel ? "№ " : "Кв. ") + ((floor + 1) * 100 + k + 1);
+                Sign(new Vector3(xk + 1.25f, 1.8f, cz0 + 0.32f), num + "\n" + who, col, 1.5f, 180);
+                if (st == 0)
+                {
+                    string name = OwnerName(b, unit);
+                    Point(new Vector3(xk, 0, cz0 + 1.1f), "ПОСТУЧАТЬ: " + (hotel ? "НОМЕР ЗАНЯТ" : name), () =>
+                    {
+                        AudioFx.Play("door");
+                        Hud.Toast(hotel ? "Гости отдыхают — не беспокоить" : H.R(3, (int)Time.time) == 0 ? name + ": «Кто там? Я занят(а), заходите позже!»" : "Никого нет дома. Владелец: " + name);
+                    });
+                }
+                var c = new GameObject("Flat " + unit).transform;
+                c.SetParent(Level, false);
+                c.localPosition = new Vector3(xk, 0, cz0);
+                c.localRotation = Quaternion.Euler(0, 180, 0);
+                Ctr = c;
+                rng = new Rng(H.U(b.id, unit, 77));
+                if (hotel) HotelRoom(b, unit, st);
+                else Home(b, unit, true, st, lux);
+                FlatDoor.Make(c, new Vector3(0, 0, -0.15f), st > 0, lux ? new Color(0.25f, 0.18f, 0.12f) : new Color(0.55f, 0.38f, 0.24f));
+                Flush();
+                Ctr = Level;
+            }
+        }
+
+        static void HotelRoom(Bld b, int unit, int st)
+        {
+            Room(6.8f, 9f, 3.0f, Mats.Tex(Tex.Tiles("carpet3", new Color(0.35f, 0.3f, 0.45f), new Color(0.32f, 0.27f, 0.41f), 2), Color.white, 0.05f), new Color(0.88f, 0.84f, 0.76f), true, 0.7f, false, 1);
+            Bed(new Vector3(-1.2f, 0, 6.5f), 180, new Color(0.95f, 0.95f, 0.95f));
+            Tv(new Vector3(-1.2f, 0, 2.2f), 0);
+            Sofa(new Vector3(2.2f, 0, 4.5f), 270, new Color(0.45f, 0.25f, 0.3f));
+            Plant(new Vector3(2.8f, 0, 8.2f));
+            if (st == 1) Point(new Vector3(0, 0, 4f), "СНЯТЬ НОМЕР И ВЫСПАТЬСЯ ($250)", () => { if (Eco.Spend(250, "Номер в отеле")) Menus.Sleep(); });
+            else if (st == 0) Npc(new Vector3(1.5f, 0, 5f), 200, b.id * 31 + unit, 0);
+        }
+
+        /// <summary>Open-plan office floor (or the sky lounge on the top floor of the agency).</summary>
+        static void OpenFloor(Bld b, int floor, bool lounge)
+        {
+            var c = new GameObject("Floor").transform;
+            c.SetParent(Level, false);
+            c.localPosition = new Vector3(EX, 0, EZ + 1.15f);
+            c.localRotation = Quaternion.Euler(0, 180, 0);
+            Ctr = c;
+            float w = 30, d = 18;
+            if (lounge)
+            {
+                Room(w, d, 4.2f, Mats.Tex(Tex.Tiles("darkfloor", new Color(0.3f, 0.3f, 0.32f), new Color(0.22f, 0.22f, 0.24f), 2), Color.white, 0.6f), new Color(0.12f, 0.13f, 0.16f), false, 1.2f, false, 2);
+                // panoramic windows on three sides
+                var sky = Mats.Glow(DayNight.IsNight ? new Color(0.05f, 0.08f, 0.2f) : new Color(0.55f, 0.75f, 0.98f));
+                mb.Box(sky, null, new Vector3(-w / 2 + 0.01f, 0.4f, 1), new Vector3(-w / 2 + 0.02f, 3.9f, d - 1), new Vector2(4, 4));
+                mb.Box(sky, null, new Vector3(w / 2 - 0.02f, 0.4f, 1), new Vector3(w / 2 - 0.01f, 3.9f, d - 1), new Vector2(4, 4));
+                mb.Box(sky, null, new Vector3(-w / 2 + 1, 0.4f, d - 0.02f), new Vector3(w / 2 - 1, 3.9f, d - 0.01f), new Vector2(4, 4));
+                Counter(new Vector3(0, 0, d - 3), 8, new Color(0.15f, 0.12f, 0.1f));
+                for (int k = 0; k < 6; k++) Mesh(PrimitiveType.Cylinder, new Vector3(-3 + k * 1.2f, 1.35f, d - 2.8f), new Vector3(0.08f, 0.2f, 0.08f), Palette.Get(Palette.Cloth, k + 3));
+                Npc(new Vector3(0, 0, d - 1.8f), 180, b.id + 900, 1, 3);
+                Sofa(new Vector3(-10, 0, 9), 90, new Color(0.15f, 0.15f, 0.2f)); Sofa(new Vector3(10, 0, 9), 270, new Color(0.15f, 0.15f, 0.2f));
+                Sofa(new Vector3(-6, 0, 14), 0, new Color(0.5f, 0.1f, 0.15f)); Sofa(new Vector3(6, 0, 14), 0, new Color(0.5f, 0.1f, 0.15f));
+                for (int k = 0; k < 6; k++) Npc(new Vector3(-9 + k * 3.5f, 0, 6 + (k % 2) * 4), k * 60, b.id + 950 + k, k % 3 == 0 ? 3 : 0);
+                Sign(new Vector3(0, 3.6f, d - 0.1f), "SKY LOUNGE · " + (floor + 1) + " ЭТАЖ", new Color(0.3f, 0.9f, 1f), 6);
+                Point(new Vector3(0, 0, d - 4.3f), "БАР НА КРЫШЕ: НАПИТКИ И ЕДА", () => Menus.Food(b, FoodDef.Restaurant));
+                Light(new Vector3(0, 3.6f, d - 3), 10, 1.4f);
+            }
+            else
+            {
+                Room(w, d, 3.4f, Mats.Tex(Tex.Tiles("carpet", new Color(0.35f, 0.4f, 0.5f), new Color(0.32f, 0.37f, 0.47f), 2), Color.white, 0.05f), new Color(0.92f, 0.93f, 0.95f), true, 1.2f, false, 2);
+                for (float x = -12; x <= 12; x += 4.8f)
+                    for (float z = 4.5f; z < d - 1.5f; z += 3.6f)
+                    {
+                        if (Mathf.Abs(x) < 2.5f && z < 6) continue;
+                        var p = new Vector3(x, 0, z);
+                        Box(p + new Vector3(-0.9f, 0.72f, -0.45f), p + new Vector3(0.9f, 0.77f, 0.45f), new Color(0.92f, 0.92f, 0.9f), true);
+                        Box(p + new Vector3(-0.35f, 0.77f, 0.1f), p + new Vector3(0.35f, 1.2f, 0.14f), new Color(0.08f, 0.08f, 0.1f));
+                        BoxM(p + new Vector3(-0.32f, 0.8f, 0.095f), p + new Vector3(0.32f, 1.17f, 0.1f), Mats.Glow(new Color(0.3f, 0.55f, 0.9f)));
+                        Chair(p + new Vector3(0, 0, -0.75f), 0, new Color(0.15f, 0.15f, 0.17f));
+                        if (rng.Chance(0.55f)) Npc(p + new Vector3(0, 0, -0.75f), 0, b.id * 13 + (int)(x * 7 + z * 3) + floor * 101, 2, 3);
+                    }
+                Plant(new Vector3(-w / 2 + 1, 0, d - 1)); Plant(new Vector3(w / 2 - 1, 0, d - 1));
+                string title = b.type == BType.Agency ? "АГЕНТСТВО «ГАД СИТИ» · ЭТАЖ " + (floor + 1) : b.name + " · ЭТАЖ " + (floor + 1);
+                Sign(new Vector3(0, 2.8f, d - 0.1f), title, b.Info.Sign, 4);
+                Point(new Vector3(3.5f, 0, 3.5f), b.type == BType.Agency ? "АГЕНТ: КУПИТЬ ЖИЛЬЁ" : "РЕСЕПШН: РАБОТА И БИЗНЕС", () => { if (b.type == BType.Agency) Menus.RealEstate(); else Menus.Building(b); });
+            }
+            Flush();
+            Ctr = Level;
+        }
+
+        // ------------------------------------------------------------------ homes
+
+        /// <summary>A home: a house/villa (whole interior) or one flat of a floor (flat = true, built in its own container).</summary>
+        static void Home(Bld b, int unit, bool flat = false, int status = -1, bool lux = false)
         {
             bool owned = Eco.OwnsHome(b.id, unit);
-            bool lux = b.type == BType.Villa || b.type == BType.Tower;
-            float w = lux ? 22 : b.type == BType.House ? 16 : 14, d = lux ? 18 : 12;
-            Room(w, d, lux ? 4f : 3.2f, WorldBuilder.Wood, lux ? new Color(0.95f, 0.95f, 0.93f) : Palette.Get(new[] { new Color(0.93f, 0.9f, 0.82f), new Color(0.85f, 0.9f, 0.92f), new Color(0.92f, 0.86f, 0.86f) }, b.id + unit));
+            if (status < 0) status = owned ? 2 : 1;
+            if (!flat) lux = b.type == BType.Villa;
+            float w = flat ? 6.8f : lux ? 22 : 16, d = flat ? 9f : lux ? 18 : 12;
+            var wallCol = lux ? new Color(0.95f, 0.95f, 0.93f) : Palette.Get(new[] { new Color(0.93f, 0.9f, 0.82f), new Color(0.85f, 0.9f, 0.92f), new Color(0.92f, 0.86f, 0.86f), new Color(0.88f, 0.92f, 0.86f) }, b.id + unit);
+            if (flat) Room(w, d, 3.0f, WorldBuilder.Wood, wallCol, true, 0.7f, false, 1);
+            else Room(w, d, lux ? 4f : 3.2f, WorldBuilder.Wood, wallCol);
             // partition wall to the bedroom
-            Box(new Vector3(-w / 2, 0, d * 0.55f), new Vector3(-1.2f, Hh, d * 0.55f + 0.15f), new Color(0.88f, 0.86f, 0.82f), true);
+            Box(new Vector3(-w / 2, 0, d * 0.55f), new Vector3(-1.0f, Hh, d * 0.55f + 0.15f), new Color(0.88f, 0.86f, 0.82f), true);
             // kitchen corner
-            Box(new Vector3(w / 2 - 0.7f, 0, 1.5f), new Vector3(w / 2, 0.95f, 6f), new Color(0.95f, 0.95f, 0.95f), true, 0.6f);
-            Box(new Vector3(w / 2 - 0.8f, 0, 6.2f), new Vector3(w / 2, 2f, 7.2f), new Color(0.85f, 0.87f, 0.9f), true, 0.7f);
+            Box(new Vector3(w / 2 - 0.7f, 0, 1.5f), new Vector3(w / 2, 0.95f, flat ? 4f : 6f), new Color(0.95f, 0.95f, 0.95f), true, 0.6f);
+            Box(new Vector3(w / 2 - 0.8f, 0, flat ? 4.2f : 6.2f), new Vector3(w / 2, 2f, flat ? 5.2f : 7.2f), new Color(0.85f, 0.87f, 0.9f), true, 0.7f);
             var home = Eco.Home(b.id, unit);
             string Style(string slot) => home == null ? null : home.decor.Find(s => s.StartsWith(slot + ":"));
             Color Col(string slot, Color def)
@@ -680,40 +913,39 @@ namespace Gad
                 int.TryParse(s.Substring(s.IndexOf(':') + 1), out int i);
                 return Palette.Get(Palette.Cloth, i);
             }
-            bool Has(string slot) => Style(slot) != null || !owned; // show-flat is furnished
-            Bed(new Vector3(-w / 2 + 2.5f, 0, d - 2f), 180, Col("bed", new Color(0.8f, 0.8f, 0.85f)));
+            bool Has(string slot) => Style(slot) != null || !owned; // show-flats and other people's homes are furnished
+            Bed(new Vector3(-w / 2 + (flat ? 1.6f : 2.5f), 0, d - 2f), 180, Col("bed", new Color(0.8f, 0.8f, 0.85f)));
             if (Has("sofa")) Sofa(new Vector3(-w / 4, 0, 3f), 90, Col("sofa", new Color(0.35f, 0.4f, 0.5f)));
             if (Has("tv")) Tv(new Vector3(-w / 2 + 0.6f, 0, 3f), 90);
-            if (Has("table")) Table(new Vector3(w / 4, 0, 4), Col("table", new Color(0.55f, 0.4f, 0.28f)));
-            if (Has("rug")) Box(new Vector3(-w / 4 - 1.5f, 0.005f, 1.5f), new Vector3(-w / 4 + 1.5f, 0.02f, 4.5f), Col("rug", new Color(0.6f, 0.2f, 0.2f)));
-            if (Has("plant")) { Plant(new Vector3(w / 2 - 1, 0, d - 1)); Plant(new Vector3(-1.8f, 0, d * 0.55f - 0.7f), 0.8f); }
-            if (Has("lamp")) { Mesh(PrimitiveType.Cylinder, new Vector3(-w / 4 + 1.8f, 0.8f, 1.2f), new Vector3(0.05f, 0.8f, 0.05f), Color.black); Mesh(PrimitiveType.Cylinder, new Vector3(-w / 4 + 1.8f, 1.7f, 1.2f), new Vector3(0.45f, 0.18f, 0.45f), Col("lamp", new Color(0.95f, 0.9f, 0.7f))); }
-            if (Has("art")) Box(new Vector3(-1, 1.3f, d * 0.55f - 0.03f), new Vector3(1, 2.3f, d * 0.55f), Col("art", new Color(0.3f, 0.5f, 0.8f)));
-            if (Has("shelf")) Shelf(new Vector3(w / 2 - 0.5f, 0, d - 4), 2.5f, false, b.id);
-            if (Has("aquarium") && owned) { Box(new Vector3(1, 0, d - 0.9f), new Vector3(3, 0.8f, d - 0.3f), new Color(0.2f, 0.2f, 0.2f), true); BoxM(new Vector3(1, 0.8f, d - 0.9f), new Vector3(3, 1.6f, d - 0.3f), Mats.Glass(new Color(0.3f, 0.6f, 0.9f, 0.5f))); }
-            if (Has("piano") && owned) Box(new Vector3(3.5f, 0, d - 1.2f), new Vector3(5.2f, 1.2f, d - 0.3f), new Color(0.05f, 0.05f, 0.05f), true, 0.9f);
-            if (Has("pc") && owned) { Box(new Vector3(-w / 2 + 4.5f, 0.72f, d - 0.9f), new Vector3(-w / 2 + 6.3f, 0.77f, d - 0.2f), new Color(0.1f, 0.1f, 0.1f), true); BoxM(new Vector3(-w / 2 + 4.9f, 0.77f, d - 0.5f), new Vector3(-w / 2 + 5.9f, 1.4f, d - 0.45f), Mats.Glow(new Color(0.4f, 0.2f, 0.9f))); }
+            if (Has("table")) Table(new Vector3(flat ? 1.1f : w / 4, 0, flat ? 2.6f : 4), Col("table", new Color(0.55f, 0.4f, 0.28f)), true, flat ? 0.75f : 1f);
+            if (Has("rug")) Box(new Vector3(-w / 4 - 1.2f, 0.005f, 1.5f), new Vector3(-w / 4 + 1.2f, 0.02f, 4.5f), Col("rug", new Color(0.6f, 0.2f, 0.2f)));
+            if (Has("plant")) { Plant(new Vector3(w / 2 - 0.8f, 0, d - 0.8f)); Plant(new Vector3(-1.5f, 0, d * 0.55f - 0.6f), 0.8f); }
+            if (Has("lamp")) { Mesh(PrimitiveType.Cylinder, new Vector3(-w / 4 + 1.4f, 0.8f, 1.0f), new Vector3(0.05f, 0.8f, 0.05f), Color.black); Mesh(PrimitiveType.Cylinder, new Vector3(-w / 4 + 1.4f, 1.7f, 1.0f), new Vector3(0.45f, 0.18f, 0.45f), Col("lamp", new Color(0.95f, 0.9f, 0.7f))); }
+            if (Has("art")) Box(new Vector3(-w / 2 + 0.6f, 1.3f, d * 0.55f - 0.03f), new Vector3(-w / 2 + 2.2f, 2.2f, d * 0.55f), Col("art", new Color(0.3f, 0.5f, 0.8f)));
+            if (Has("shelf")) Shelf(new Vector3(w / 2 - 0.5f, 0, d - 2.6f), 2.0f, false, b.id + unit);
+            if (Has("aquarium") && owned) { Box(new Vector3(0.6f, 0, d - 0.9f), new Vector3(2.2f, 0.8f, d - 0.3f), new Color(0.2f, 0.2f, 0.2f), true); BoxM(new Vector3(0.6f, 0.8f, d - 0.9f), new Vector3(2.2f, 1.6f, d - 0.3f), Mats.Glass(new Color(0.3f, 0.6f, 0.9f, 0.5f))); }
+            if (Has("piano") && owned) Box(new Vector3(-0.8f, 0, d * 0.55f + 0.2f), new Vector3(0.9f, 1.2f, d * 0.55f + 1.0f), new Color(0.05f, 0.05f, 0.05f), true, 0.9f);
+            if (Has("pc") && owned) { Box(new Vector3(-w / 2 + 0.3f, 0.72f, d * 0.55f + 0.4f), new Vector3(-w / 2 + 1.0f, 0.77f, d * 0.55f + 2.0f), new Color(0.1f, 0.1f, 0.1f), true); BoxM(new Vector3(-w / 2 + 0.6f, 0.77f, d * 0.55f + 0.8f), new Vector3(-w / 2 + 0.65f, 1.4f, d * 0.55f + 1.6f), Mats.Glow(new Color(0.4f, 0.2f, 0.9f))); }
 
-            if (owned)
+            if (status == 2)
             {
-                Point(new Vector3(-w / 2 + 2.5f, 0, d - 3.8f), "СПАТЬ (ВОССТАНОВИТЬ ЭНЕРГИЮ)", () => Menus.Sleep());
-                Point(new Vector3(w / 2 - 1.8f, 0, 6.7f), "ХОЛОДИЛЬНИК: ПОЕСТЬ ($10)", () => Eco.Eat(10, 35, "Перекусили дома"));
-                Point(new Vector3(-2, 0, d * 0.55f - 1.2f), "ГАРДЕРОБ: ПЕРЕОДЕТЬСЯ", () => Menus.Wardrobe(false));
-                Point(new Vector3(0, 0, 2.2f), "ОБУСТРОИТЬ ДОМ", () => Menus.Decor(home));
+                Point(new Vector3(-w / 2 + (flat ? 1.6f : 2.5f), 0, d - 3.8f), "СПАТЬ (ВОССТАНОВИТЬ ЭНЕРГИЮ)", () => Menus.Sleep());
+                Point(new Vector3(w / 2 - 1.6f, 0, flat ? 4.7f : 6.7f), "ХОЛОДИЛЬНИК: ПОЕСТЬ ($10)", () => Eco.Eat(10, 35, "Перекусили дома"));
+                Point(new Vector3(-1.6f, 0, d * 0.55f - 1.2f), "ГАРДЕРОБ: ПЕРЕОДЕТЬСЯ", () => Menus.Dress(false));
+                Point(new Vector3(0.6f, 0, 1.6f), "ОБУСТРОИТЬ ДОМ", () => Menus.Decor(home));
                 Sign(new Vector3(0, Hh - 0.6f, d - 0.3f), "МОЙ ДОМ", new Color(0.3f, 0.8f, 0.4f), 3);
             }
-            else
+            else if (status == 1)
             {
                 int price = b.UnitPrice(unit);
                 Sign(new Vector3(0, Hh - 0.6f, d - 0.3f), "ПРОДАЁТСЯ · " + Hud.Money(price), new Color(0.95f, 0.75f, 0.2f), 3);
-                Point(new Vector3(0, 0, 2.2f), "КУПИТЬ — " + Hud.Money(price), () => Menus.BuyHome(b, unit));
+                Point(new Vector3(0, 0, 2.6f), "КУПИТЬ — " + Hud.Money(price), () => Menus.BuyHome(b, unit));
             }
-            if (unit > 0)
+            else
             {
-                // the exit of a flat leads back to the lobby
-                Points.RemoveAll(p => p.Label == "ВЫЙТИ НА УЛИЦУ");
-                Point(new Vector3(0, 0, 0.6f), "В ЛОББИ", () => Enter(b, 0));
-                Point(new Vector3(2.4f, 0, 0.6f), "ВЫЙТИ НА УЛИЦУ", Exit);
+                // someone lives here
+                var r = new Rng(H.U(b.id, unit, 3));
+                if (r.Chance(0.7f)) Npc(new Vector3(-w / 4, 0, 3f), 90, b.id * 7 + unit, 2);
             }
         }
     }

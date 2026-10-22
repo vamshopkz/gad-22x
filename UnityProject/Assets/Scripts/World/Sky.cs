@@ -95,8 +95,9 @@ namespace Gad
                 PlayerCtl.I.Cam.backgroundColor = new Color(0.1f, 0.1f, 0.12f);
             }
 
+            PostFx.Tick(NightK, inside);
             // windows and lamps
-            float win = Mathf.SmoothStep(0, 1, NightK) * 1.6f + wx * 0.25f;
+            float win = Mathf.SmoothStep(0, 1, NightK) * 0.85f + wx * 0.15f;
             foreach (var m in WorldBuilder.NightMats) m.SetColor("_EmissionColor", Color.white * win);
             if (WorldBuilder.LampGlow != null)
                 WorldBuilder.LampGlow.color = Color.Lerp(new Color(0.75f, 0.75f, 0.72f), new Color(1f, 0.85f, 0.55f) * 1.6f, NightK);
@@ -105,6 +106,108 @@ namespace Gad
                 lastNight = IsNight;
                 if (PlayerCtl.I != null && PlayerCtl.I.Car != null) PlayerCtl.I.Car.SetHeadlights(IsNight);
             }
+        }
+    }
+
+    /// <summary>
+    /// Realtime reflections: one probe that follows the camera and re-renders every few seconds,
+    /// so car paint, chrome and glass towers reflect the real sky and city (time of day, weather).
+    /// </summary>
+    public class Reflections : MonoBehaviour
+    {
+        ReflectionProbe probe;
+        float next;
+        Vector3 last;
+
+        public static void Create()
+        {
+            var go = new GameObject("Reflections");
+            var r = go.AddComponent<Reflections>();
+            r.probe = go.AddComponent<ReflectionProbe>();
+            r.probe.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
+            r.probe.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.ViaScripting;
+            r.probe.timeSlicingMode = UnityEngine.Rendering.ReflectionProbeTimeSlicingMode.IndividualFaces;
+            r.probe.resolution = 128;
+            r.probe.size = new Vector3(4000, 2000, 4000);
+            r.probe.boxProjection = false;
+            r.probe.hdr = false;
+            r.probe.farClipPlane = 600;
+            r.probe.importance = 1;
+            r.probe.cullingMask = ~((1 << 5) | (1 << 8) | (1 << 15));
+        }
+
+        void Update()
+        {
+            var pl = PlayerCtl.I;
+            if (pl == null || pl.Cam == null) return;
+            var p = pl.Cam.transform.position;
+            bool inside = pl.Inside >= 0;
+            transform.position = inside ? p : new Vector3(p.x, Mathf.Max(p.y, 2f), p.z);
+            float interval = Gfx.Level == 0 ? 12f : Gfx.Level == 1 ? 4f : 1.5f;
+            if (Time.unscaledTime >= next || (p - last).sqrMagnitude > 80f * 80f)
+            {
+                next = Time.unscaledTime + interval;
+                last = p;
+                probe.RenderProbe();
+            }
+        }
+    }
+
+    /// <summary>Post-processing: bloom (neon, windows, headlights glow), ACES tonemapping, colour grading, vignette.</summary>
+    public static class PostFx
+    {
+        static Volume vol;
+        static Bloom bloom;
+        static ColorAdjustments color;
+        static Vignette vignette;
+
+        public static void Create()
+        {
+            var go = new GameObject("PostFx");
+            vol = go.AddComponent<Volume>();
+            vol.isGlobal = true;
+            var p = ScriptableObject.CreateInstance<VolumeProfile>();
+            bloom = p.Add<Bloom>(true);
+            bloom.threshold.Override(0.95f);
+            bloom.intensity.Override(0.9f);
+            bloom.scatter.Override(0.72f);
+            bloom.highQualityFiltering.Override(false);
+            var tm = p.Add<Tonemapping>(true);
+            tm.mode.Override(TonemappingMode.ACES);
+            color = p.Add<ColorAdjustments>(true);
+            color.postExposure.Override(0.35f);
+            color.contrast.Override(12f);
+            color.saturation.Override(8f);
+            vignette = p.Add<Vignette>(true);
+            vignette.intensity.Override(0.22f);
+            vignette.smoothness.Override(0.45f);
+            var wb = p.Add<WhiteBalance>(true);
+            wb.temperature.Override(0f);
+            vol.profile = p;
+            Apply();
+        }
+
+        public static void Apply()
+        {
+            var cam = PlayerCtl.I != null ? PlayerCtl.I.Cam : null;
+            if (cam != null)
+            {
+                var data = cam.GetUniversalAdditionalCameraData();
+                data.renderPostProcessing = Gfx.Level > 0;
+                data.antialiasing = Gfx.Level == 2 ? AntialiasingMode.SubpixelMorphologicalAntiAliasing : AntialiasingMode.None;
+                cam.allowHDR = Gfx.Level > 0;
+            }
+            var urp = GraphicsSettings.defaultRenderPipeline as UniversalRenderPipelineAsset;
+            if (urp != null) urp.supportsHDR = Gfx.Level > 0;
+        }
+
+        /// <summary>Night: stronger bloom (neon city), cooler white balance.</summary>
+        public static void Tick(float nightK, bool inside)
+        {
+            if (vol == null) return;
+            bloom.intensity.value = inside ? 0.5f : Mathf.Lerp(0.6f, 1.2f, nightK);
+            bloom.threshold.value = Mathf.Lerp(1.0f, 0.9f, nightK);
+            color.postExposure.value = inside ? 0.25f : Mathf.Lerp(0.3f, 0.55f, nightK);
         }
     }
 
@@ -195,6 +298,7 @@ namespace Gad
             TrafficCars = Level == 0 ? 8 : Level == 1 ? 14 : 22;
             Pedestrians = Level == 0 ? 6 : Level == 1 ? 12 : 18;
             if (PlayerCtl.I != null) PlayerCtl.I.Cam.farClipPlane = FogEnd + 200;
+            PostFx.Apply();
             Application.targetFrameRate = 60;
         }
     }
