@@ -113,6 +113,8 @@ namespace Gad
     public static class Prim
     {
         static readonly Dictionary<PrimitiveType, Mesh> meshes = new Dictionary<PrimitiveType, Mesh>();
+        // CreatePrimitive adds these colliders: keep them in stripped (WebGL) builds.
+        static readonly System.Type[] keep = { typeof(SphereCollider), typeof(CapsuleCollider), typeof(BoxCollider), typeof(MeshCollider) };
 
         public static Mesh MeshOf(PrimitiveType t)
         {
