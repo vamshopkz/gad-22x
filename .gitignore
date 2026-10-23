@@ -14,3 +14,7 @@ web-publish/
 shots*/
 *.apk
 .DS_Store
+UnityProject/.utmp/
+assets_src/dl/
+shots*/
+facade_preview.png

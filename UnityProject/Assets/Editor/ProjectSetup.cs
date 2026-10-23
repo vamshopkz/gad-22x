@@ -110,7 +110,54 @@ public static class ProjectSetup
         return urp;
     }
 
-    static void SetupImporters() { }
+    static void SetupImporters()
+    {
+        void Tex(string folder, System.Func<string, (bool normal, bool linear, int max)> rule)
+        {
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { folder }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!(AssetImporter.GetAtPath(path) is TextureImporter ti)) continue;
+                var (normal, linear, max) = rule(path);
+                var type = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                if (ti.textureType == type && ti.sRGBTexture == !linear && ti.maxTextureSize == max && ti.anisoLevel == 4 && ti.mipmapEnabled) continue;
+                ti.textureType = type;
+                ti.sRGBTexture = !linear && !normal;
+                ti.maxTextureSize = max;
+                ti.mipmapEnabled = true;
+                ti.anisoLevel = 4;
+                ti.wrapMode = TextureWrapMode.Repeat;
+                ti.textureCompression = TextureImporterCompression.Compressed;
+                ti.SaveAndReimport();
+            }
+        }
+        Tex("Assets/Resources/PH", p => (p.Contains("_nor"), false, p.Contains("_nor") ? 512 : 1024));
+        Tex("Assets/Resources/Facades", p => (p.EndsWith("_n.png"), p.EndsWith("_m.png"), p.EndsWith("_a.png") ? 2048 : 1024));
+        Tex("Assets/Resources/Models", p => (false, false, 1024));
+        foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { "Assets/Resources/Models" }))
+        {
+            var path = AssetDatabase.GUIDToAssetPath(guid);
+            if (!(AssetImporter.GetAtPath(path) is ModelImporter mi)) continue;
+            if (mi.materialImportMode == ModelImporterMaterialImportMode.None && !mi.importAnimation && mi.isReadable) continue;
+            mi.materialImportMode = ModelImporterMaterialImportMode.None;
+            mi.importAnimation = false; mi.animationType = ModelImporterAnimationType.None;
+            mi.importCameras = false; mi.importLights = false;
+            mi.isReadable = true;
+            mi.SaveAndReimport();
+        }
+        foreach (var guid in AssetDatabase.FindAssets("t:Texture", new[] { "Assets/Resources/Sky" }))
+        {
+            var path = AssetDatabase.GUIDToAssetPath(guid);
+            if (!(AssetImporter.GetAtPath(path) is TextureImporter ti)) continue;
+            if (ti.wrapModeU == TextureWrapMode.Repeat && ti.maxTextureSize == 2048 && !ti.mipmapEnabled) continue;
+            ti.textureType = TextureImporterType.Default;
+            ti.textureShape = TextureImporterShape.Texture2D;
+            ti.mipmapEnabled = false;
+            ti.maxTextureSize = 2048;
+            ti.wrapModeU = TextureWrapMode.Repeat; ti.wrapModeV = TextureWrapMode.Clamp;
+            ti.SaveAndReimport();
+        }
+    }
 
     // ---------------------------------------------------------------------
 
@@ -179,6 +226,20 @@ public static class ProjectSetup
         MakeTransparent(m);
         Save(m, "LitTransparent");
 
+        // Facades and photo materials: base + normal + metal/smoothness mask + night emission
+        m = new Material(lit) { enableInstancing = true };
+        m.EnableKeyword("_NORMALMAP"); m.EnableKeyword("_EMISSION"); m.EnableKeyword("_METALLICSPECGLOSSMAP");
+        m.SetColor("_EmissionColor", Color.black);
+        m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        Save(m, "LitFacade");
+        m = new Material(lit) { enableInstancing = true };
+        m.EnableKeyword("_NORMALMAP"); m.EnableKeyword("_EMISSION");
+        m.SetColor("_EmissionColor", Color.black);
+        m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        Save(m, "LitNormalEmissive");
+        var pano = Shader.Find("Skybox/Panoramic");
+        if (pano != null) Save(new Material(pano), "SkyPano");
+
         m = new Material(unlit);
         Save(m, "Unlit");
 
@@ -213,7 +274,7 @@ public static class ProjectSetup
         if (inst != null) inst.intValue = 2; // keep all instancing variants
 
         var arr = gs.FindProperty("m_AlwaysIncludedShaders");
-        foreach (var name in new[] { "TextMeshPro/Mobile/Distance Field", "TextMeshPro/Distance Field", "UI/Default", "Skybox/Procedural" })
+        foreach (var name in new[] { "TextMeshPro/Mobile/Distance Field", "TextMeshPro/Distance Field", "UI/Default", "Skybox/Procedural", "Skybox/Panoramic" })
         {
             var sh = Shader.Find(name);
             if (sh == null) { Debug.LogWarning("[Setup] Shader not found " + name); continue; }

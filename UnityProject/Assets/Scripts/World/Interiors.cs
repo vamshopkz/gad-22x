@@ -93,7 +93,7 @@ namespace Gad
         {
             W = w; D = d; Hh = h;
             floorMat = floor;
-            wallMat = Mats.Lit(wall, 0.1f);
+            wallMat = Photo.Mat("plastered_wall", Color.Lerp(wall, Color.white, 0.25f) * 1.18f, 0.1f, 0.5f);
             var t = Root;
             // floor + ceiling
             mb.Box(Mats.Lit(wall * 0.8f), floor, new Vector3(-w / 2, -0.3f, 0), new Vector3(w / 2, 0, d), new Vector2(4, 4));
@@ -222,8 +222,20 @@ namespace Gad
             BoxM(c + new Vector3(s.x / 2 - 0.04f, 0, -s.z / 2), c + new Vector3(s.x / 2, 2.1f, s.z / 2), WorldBuilder.Metal);
         }
 
+        static bool chairModels;
+
         static void Table(Vector3 c, Color col, bool chairs = true, float size = 1f)
         {
+            if (chairs && cafeTables && Model("outdoor_table_chair_set_01", c, H.R(4, (int)c.x, (int)c.z) * 90, 1.9f * size)) return;
+            if (Model("wooden_table_02", c, 0, 1.2f * size, null, true))
+            {
+                if (!chairs) return;
+                chairModels = true;
+                foreach (var o in new[] { new Vector3(0, 0, 0.95f), new Vector3(0, 0, -0.95f) })
+                    Chair(c + o * size, Quaternion.LookRotation(-o).eulerAngles.y, col * 0.7f);
+                chairModels = false;
+                return;
+            }
             Box(c + new Vector3(-0.6f * size, 0.72f, -0.6f * size), c + new Vector3(0.6f * size, 0.78f, 0.6f * size), col, false, 0.4f);
             Mesh(PrimitiveType.Cylinder, c + new Vector3(0, 0.36f, 0), new Vector3(0.12f, 0.36f, 0.12f), new Color(0.2f, 0.2f, 0.2f));
             Col(c + new Vector3(0, 0.4f, 0), new Vector3(1.2f * size, 0.8f, 1.2f * size), 12);
@@ -234,6 +246,7 @@ namespace Gad
 
         static void Chair(Vector3 c, float yaw, Color col)
         {
+            if (chairModels && Model("ArmChair_01", c, yaw, 0.6f, Color.Lerp(col, Color.white, 0.4f), false)) return;
             var rot = Quaternion.Euler(0, yaw, 0);
             var m = Mats.Lit(col);
             mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(c + Vector3.up * 0.45f, rot, new Vector3(0.45f, 0.06f, 0.45f)), m);
@@ -241,14 +254,25 @@ namespace Gad
             mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(c + Vector3.up * 0.22f, rot, new Vector3(0.4f, 0.44f, 0.4f)), Mats.Lit(new Color(0.2f, 0.2f, 0.2f)));
         }
 
+        /// <summary>Places a real (Poly Haven) model in the current container; false if it is missing.</summary>
+        static bool Model(string name, Vector3 pos, float yaw, float fit, Color? tint = null, bool collide = true) =>
+            ModelLib.Place(Ctr, name, pos, yaw, fit, collide, tint) != null;
+
         static void Plant(Vector3 c, float s = 1f)
         {
+            if (Model("potted_plant_04", c, H.R(360, (int)(c.x * 10), (int)(c.z * 10)), 0.75f * s, null, true)) return;
             Mesh(PrimitiveType.Cylinder, c + Vector3.up * 0.25f * s, new Vector3(0.45f, 0.25f, 0.45f) * s, new Color(0.55f, 0.35f, 0.25f));
             Mesh(PrimitiveType.Sphere, c + Vector3.up * 0.9f * s, new Vector3(0.8f, 1f, 0.8f) * s, new Color(0.2f, 0.5f, 0.22f));
         }
 
         static void Sofa(Vector3 c, float yaw, Color col)
         {
+            if (Model(H.R(2, (int)(c.x * 7), (int)(c.z * 7)) == 0 ? "sofa_02" : "sofa_03", c, yaw, 2.2f, Color.Lerp(col, Color.white, 0.55f)))
+            {
+                // a coffee table and an armchair go with it
+                Model("modern_coffee_table_01", c + Quaternion.Euler(0, yaw, 0) * new Vector3(0, 0, 1.25f), yaw, 1.1f, null, true);
+                return;
+            }
             var rot = Quaternion.Euler(0, yaw, 0);
             var m = Mats.Lit(col, 0.1f);
             mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(c + Vector3.up * 0.25f, rot, new Vector3(2.2f, 0.5f, 0.9f)), m);
@@ -267,8 +291,11 @@ namespace Gad
             mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(c + Vector3.up * 0.8f + rot * new Vector3(0, 0, -1.08f), rot, new Vector3(1.8f, 1.1f, 0.1f)), WorldBuilder.Wood);
         }
 
+        static bool cafeTables;
+
         static void Tv(Vector3 c, float yaw)
         {
+            Model("side_table_01", c + Quaternion.Euler(0, yaw, 0) * new Vector3(1.2f, 0, 0.1f), yaw, 0.5f, null, true);
             var rot = Quaternion.Euler(0, yaw, 0);
             mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(c + Vector3.up * 0.25f, rot, new Vector3(1.8f, 0.5f, 0.45f)), WorldBuilder.Wood);
             mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(c + Vector3.up * 1.15f, rot, new Vector3(1.6f, 0.92f, 0.06f)), Mats.Lit(new Color(0.05f, 0.05f, 0.06f), 0.9f));
@@ -337,10 +364,10 @@ namespace Gad
             int unit = 0;
             if (floor > 0 && HasLift(b)) { UpperFloor(b, floor); return; }
             var accent = b.Info.Sign;
-            var tiles = Mats.Tex(Tex.Tiles("floortile", new Color(0.86f, 0.85f, 0.82f), new Color(0.7f, 0.7f, 0.68f), 4), Color.white, 0.5f);
-            var dark = Mats.Tex(Tex.Tiles("darkfloor", new Color(0.3f, 0.3f, 0.32f), new Color(0.22f, 0.22f, 0.24f), 2), Color.white, 0.6f);
+            var tiles = Photo.Mat("interior_tiles", Color.white, 0.55f);
+            var dark = Photo.Mat("terrazzo_tiles", new Color(0.6f, 0.6f, 0.62f), 0.65f);
             var concrete = WorldBuilder.Concrete;
-            var wood = WorldBuilder.Wood;
+            var wood = Photo.Mat("laminate_floor_02", Color.white, 0.45f);
 
             bool homeView = (b.type == BType.House || b.type == BType.Villa) && Eco.OwnsHome(b.id, 0);
             if (homeView) { Home(b, unit); Finish(b); return; }
@@ -378,7 +405,8 @@ namespace Gad
                     for (int i = 0; i < (big ? 5 : 2); i++) Shelf(new Vector3(-W / 2 + 4 + i * 4.2f, 0, D / 2 + 1), D - 7, false, b.id * 10 + i);
                     Counter(new Vector3(W / 2 - 3, 0, 3.5f), 3.2f, accent, false);
                     Npc(new Vector3(W / 2 - 1.8f, 0, 3.5f), 270, b.id, 0);
-                    Box(new Vector3(W / 2 - 3.3f, 1.1f, 3f), new Vector3(W / 2 - 2.8f, 1.5f, 3.5f), new Color(0.15f, 0.15f, 0.15f));
+                    if (!Model("CashRegister_01", new Vector3(W / 2 - 3f, 1.1f, 3.3f), 90, 0.5f, null, false))
+                        Box(new Vector3(W / 2 - 3.3f, 1.1f, 3f), new Vector3(W / 2 - 2.8f, 1.5f, 3.5f), new Color(0.15f, 0.15f, 0.15f));
                     Point(new Vector3(W / 2 - 4f, 0, 3.5f), "КАССА: КУПИТЬ ЕДУ", () => Menus.Food(b, FoodDef.Shop));
                     Sign(new Vector3(0, 3.4f, D - 0.4f), b.name, accent, 4);
                     break;
@@ -390,9 +418,11 @@ namespace Gad
                     bool r = b.type == BType.Restaurant;
                     Room(r ? 20 : 14, r ? 16 : 12, 3.8f, r ? dark : wood, r ? new Color(0.45f, 0.18f, 0.16f) : new Color(0.9f, 0.82f, 0.7f));
                     var tcol = r ? new Color(0.95f, 0.95f, 0.95f) : new Color(0.55f, 0.38f, 0.22f);
+                    cafeTables = !r;
                     for (float x = -W / 2 + 3; x < W / 2 - 4; x += 3.6f)
                         for (float z = 3.5f; z < D - 5; z += 3.6f)
                             Table(new Vector3(x, 0, z), tcol);
+                    cafeTables = false;
                     Counter(new Vector3(0, 0, D - 2.2f), W * 0.5f, accent);
                     Npc(new Vector3(-1.5f, 0, D - 1.2f), 180, b.id, 1);
                     Npc(new Vector3(2.5f, 0, D - 1.2f), 180, b.id + 1, 0);
@@ -872,9 +902,10 @@ namespace Gad
                     {
                         if (Mathf.Abs(x) < 2.5f && z < 6) continue;
                         var p = new Vector3(x, 0, z);
-                        Box(p + new Vector3(-0.9f, 0.72f, -0.45f), p + new Vector3(0.9f, 0.77f, 0.45f), new Color(0.92f, 0.92f, 0.9f), true);
-                        Box(p + new Vector3(-0.35f, 0.77f, 0.1f), p + new Vector3(0.35f, 1.2f, 0.14f), new Color(0.08f, 0.08f, 0.1f));
-                        BoxM(p + new Vector3(-0.32f, 0.8f, 0.095f), p + new Vector3(0.32f, 1.17f, 0.1f), Mats.Glow(new Color(0.3f, 0.55f, 0.9f)));
+                        if (Model("metal_office_desk", p, 0, 1.8f)) Model("classic_laptop", p + new Vector3(0, 0.79f, 0.05f), 180, 0.38f, null, false);
+                        else Box(p + new Vector3(-0.9f, 0.72f, -0.45f), p + new Vector3(0.9f, 0.77f, 0.45f), new Color(0.92f, 0.92f, 0.9f), true);
+                        Box(p + new Vector3(-0.35f, 0.79f, 0.2f), p + new Vector3(0.35f, 1.22f, 0.24f), new Color(0.08f, 0.08f, 0.1f));
+                        BoxM(p + new Vector3(-0.32f, 0.82f, 0.195f), p + new Vector3(0.32f, 1.19f, 0.2f), Mats.Glow(new Color(0.3f, 0.55f, 0.9f)));
                         Chair(p + new Vector3(0, 0, -0.75f), 0, new Color(0.15f, 0.15f, 0.17f));
                         if (rng.Chance(0.55f)) Npc(p + new Vector3(0, 0, -0.75f), 0, b.id * 13 + (int)(x * 7 + z * 3) + floor * 101, 2, 3);
                     }
@@ -922,7 +953,10 @@ namespace Gad
             if (Has("plant")) { Plant(new Vector3(w / 2 - 0.8f, 0, d - 0.8f)); Plant(new Vector3(-1.5f, 0, d * 0.55f - 0.6f), 0.8f); }
             if (Has("lamp")) { Mesh(PrimitiveType.Cylinder, new Vector3(-w / 4 + 1.4f, 0.8f, 1.0f), new Vector3(0.05f, 0.8f, 0.05f), Color.black); Mesh(PrimitiveType.Cylinder, new Vector3(-w / 4 + 1.4f, 1.7f, 1.0f), new Vector3(0.45f, 0.18f, 0.45f), Col("lamp", new Color(0.95f, 0.9f, 0.7f))); }
             if (Has("art")) Box(new Vector3(-w / 2 + 0.6f, 1.3f, d * 0.55f - 0.03f), new Vector3(-w / 2 + 2.2f, 2.2f, d * 0.55f), Col("art", new Color(0.3f, 0.5f, 0.8f)));
-            if (Has("shelf")) Shelf(new Vector3(w / 2 - 0.5f, 0, d - 2.6f), 2.0f, false, b.id + unit);
+            if (Has("shelf") && !Model("wooden_bookshelf_worn", new Vector3(w / 2 - 0.45f, 0, d - 2.6f), 270, 1.3f)) Shelf(new Vector3(w / 2 - 0.5f, 0, d - 2.6f), 2.0f, false, b.id + unit);
+            Model("ClassicNightstand_01", new Vector3(-w / 2 + (flat ? 1.6f : 2.5f) + 1.3f, 0, d - 0.6f), 180, 0.5f);
+            if (Has("lamp")) Model("modern_ceiling_lamp_01", new Vector3(-w / 4, Hh - 0.95f, 3f), 0, 0.45f, null, false);
+            if (Has("sofa")) Model("mid_century_lounge_chair", new Vector3(-w / 4 + (flat ? 1.6f : 2.2f), 0, 4.6f), 225, 0.85f);
             if (Has("aquarium") && owned) { Box(new Vector3(0.6f, 0, d - 0.9f), new Vector3(2.2f, 0.8f, d - 0.3f), new Color(0.2f, 0.2f, 0.2f), true); BoxM(new Vector3(0.6f, 0.8f, d - 0.9f), new Vector3(2.2f, 1.6f, d - 0.3f), Mats.Glass(new Color(0.3f, 0.6f, 0.9f, 0.5f))); }
             if (Has("piano") && owned) Box(new Vector3(-0.8f, 0, d * 0.55f + 0.2f), new Vector3(0.9f, 1.2f, d * 0.55f + 1.0f), new Color(0.05f, 0.05f, 0.05f), true, 0.9f);
             if (Has("pc") && owned) { Box(new Vector3(-w / 2 + 0.3f, 0.72f, d * 0.55f + 0.4f), new Vector3(-w / 2 + 1.0f, 0.77f, d * 0.55f + 2.0f), new Color(0.1f, 0.1f, 0.1f), true); BoxM(new Vector3(-w / 2 + 0.6f, 0.77f, d * 0.55f + 0.8f), new Vector3(-w / 2 + 0.65f, 1.4f, d * 0.55f + 1.6f), Mats.Glow(new Color(0.4f, 0.2f, 0.9f))); }

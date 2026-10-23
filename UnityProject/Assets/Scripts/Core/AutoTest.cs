@@ -21,7 +21,7 @@ namespace Gad
         {
             dir = Boot.Arg("-shots") ?? Path.Combine(Application.persistentDataPath, "shots");
             Directory.CreateDirectory(dir);
-            StartCoroutine(Multiplayer ? Mp() : Run());
+            StartCoroutine(Multiplayer ? Mp() : Boot.Has("-homes") ? Homes() : Run());
         }
 
         void Check(string name, bool ok, string info = "")
@@ -375,6 +375,21 @@ namespace Gad
             yield return Shot("59_rain_wet");
             Weather.TestState = 0; DayNight.TestHour = 12f;
             PlayerCtl.ShotCam = false;
+            // close-ups of homes from the street (daylight)
+            DayNight.TestHour = 15.5f;
+            foreach (var (bt, nm) in new[] { (BType.Villa, "70_villa"), (BType.House, "71_house"), (BType.Apartment, "72_flats"), (BType.Shop, "73_shop"), (BType.Tower, "74_tower") })
+            {
+                var hb = City.Nearest(bt, new Vector3(7 * City.P, 0, 3 * City.P));
+                var fd = hb.FrontDir; var sd = Vector3.Cross(Vector3.up, fd);
+                float far = bt == BType.Tower ? 45f : bt == BType.Apartment ? 26f : 17f;
+                pl.Teleport(hb.door + fd * 6f, 0);
+                PlayerCtl.ShotCam = true;
+                PlayerCtl.ShotPos = hb.door + fd * far + sd * far * 0.55f + Vector3.up * (bt == BType.Tower ? 3f : 2.2f);
+                PlayerCtl.ShotLook = hb.door + Vector3.up * (bt == BType.Tower ? 25f : bt == BType.Apartment ? 8f : 3.5f) - sd * 2f;
+                yield return Wait(1.6f);
+                yield return Shot(nm);
+            }
+            PlayerCtl.ShotCam = false; DayNight.TestHour = 12f;
 
             // windows
             pl.Teleport(City.Spawn, 0);
@@ -404,6 +419,32 @@ namespace Gad
             while (Time.realtimeSinceStartup - t0 < 2f) { frames++; yield return null; }
             fps = frames / (Time.realtimeSinceStartup - t0);
             Check("FPS (Mac)", fps > 20, fps.ToString("0"));
+            Finish();
+        }
+
+        IEnumerator Homes()
+        {
+            var pl = PlayerCtl.I;
+            Weather.TestState = 0;
+            float hour = float.TryParse(Boot.Arg("-hour"), out var hh) ? hh : 15.5f;
+            DayNight.TestHour = hour;
+            yield return Wait(2f);
+            foreach (var (bt, nm) in new[] { (BType.Villa, "70_villa"), (BType.House, "71_house"), (BType.Apartment, "72_flats"), (BType.Shop, "73_shop"), (BType.Tower, "74_tower"), (BType.Hotel, "75_hotel") })
+            {
+                var hb = City.Nearest(bt, new Vector3(7 * City.P, 0, 3 * City.P));
+                var fd = hb.FrontDir; var sd = Vector3.Cross(Vector3.up, fd);
+                float far = bt == BType.Tower ? 45f : bt == BType.Apartment || bt == BType.Hotel ? 26f : 17f;
+                pl.Teleport(hb.door + fd * 6f, 0);
+                PlayerCtl.ShotCam = true;
+                PlayerCtl.ShotPos = hb.door + fd * far + sd * far * 0.55f + Vector3.up * (bt == BType.Tower ? 3f : 2.2f);
+                PlayerCtl.ShotLook = hb.door + Vector3.up * (bt == BType.Tower ? 25f : bt == BType.Apartment || bt == BType.Hotel ? 8f : 3.5f) - sd * 2f;
+                yield return Wait(1.6f);
+                yield return Shot(nm);
+            }
+            PlayerCtl.ShotCam = true;
+            PlayerCtl.ShotPos = new Vector3(2.5f * City.P, 55, 3.2f * City.P); PlayerCtl.ShotLook = new Vector3(7 * City.P, 30, 7.5f * City.P);
+            yield return Wait(2f);
+            yield return Shot("76_aerial");
             Finish();
         }
 

@@ -17,7 +17,7 @@ namespace Gad
         public static float NightK;         // 0 day .. 1 night
         public static float TestHour = -1;  // autotest override
         Light sun;
-        Material sky;
+        Material sky, pano;
         bool lastNight;
 
         public static void Create()
@@ -33,6 +33,16 @@ namespace Gad
             RenderSettings.sun = I.sun;
             I.sky = RenderSettings.skybox != null ? new Material(RenderSettings.skybox) : null;
             if (I.sky != null) RenderSettings.skybox = I.sky;
+            var hdr = Resources.Load<Texture>("Sky/sky_day");
+            var pm = Resources.Load<Material>("Materials/SkyPano");
+            if (hdr != null && pm != null)
+            {
+                I.pano = new Material(pm);
+                I.pano.SetTexture("_MainTex", hdr);
+                I.pano.SetFloat("_Mapping", 1);
+                I.pano.SetFloat("_ImageType", 0);
+                I.pano.SetFloat("_Rotation", 40);
+            }
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
@@ -81,6 +91,17 @@ namespace Gad
                 RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.35f, 0.32f, 0.28f), new Color(0.05f, 0.05f, 0.07f), NightK);
                 RenderSettings.fog = true;
                 RenderSettings.fogColor = horizon;
+            }
+            bool usePano = pano != null && NightK < 0.6f && !inside;
+            var wantSky = usePano ? pano : sky;
+            if (wantSky != null && RenderSettings.skybox != wantSky) RenderSettings.skybox = wantSky;
+            if (usePano)
+            {
+                float k = 1f - NightK / 0.6f;
+                pano.SetFloat("_Exposure", Mathf.Lerp(0.12f, 1.05f, k) * Mathf.Lerp(1f, 0.6f, wx));
+                var tint = Color.Lerp(new Color(1f, 0.62f, 0.45f), new Color(0.5f, 0.5f, 0.5f), Mathf.Clamp01(elev * 3f));
+                pano.SetColor("_Tint", Color.Lerp(tint, new Color(0.42f, 0.43f, 0.45f), wx * 0.7f));
+                if (!inside) RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, new Color(0.72f, 0.78f, 0.86f) * Mathf.Lerp(0.2f, 1f, k), 0.6f);
             }
             if (sky != null)
             {

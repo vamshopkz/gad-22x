@@ -11,7 +11,7 @@ namespace Gad
     /// </summary>
     public static partial class WorldBuilder
     {
-        public static Material[] Facade = new Material[8];
+        public static Material[] Facade = new Material[10];
         public static Material Store, Roof, Asphalt, Sidewalk, Grass, Plaza, Concrete, Sand, Water, Rock, Paint, PaintYellow,
             DoorGlass, Frame, RoofTiles, Curbside, LampGlow, WindowGlass, Wood, Metal;
         public static Transform Root;
@@ -47,22 +47,25 @@ namespace Gad
 
         static void MakeMaterials()
         {
-            for (int s = 0; s < 8; s++)
+            for (int s = 0; s < Facade.Length; s++)
             {
-                var (main, emit) = Tex.Facade(s);
-                Facade[s] = Mats.Emissive(main, emit, Color.white, s == 0 || s == 7 ? 0.75f : 0.25f);
-                Facade[s].name = "Facade" + s;
+                Facade[s] = Photo.Facade(s);
+                if (Facade[s] == null)
+                {
+                    var (main, emit) = Tex.Facade(Mathf.Min(s, 7));
+                    Facade[s] = Mats.Emissive(main, emit, Color.white, s == 0 || s == 7 ? 0.75f : 0.25f);
+                }
                 NightMats.Add(Facade[s]);
             }
             Store = Facade[4];
-            Roof = Mats.Tex(Tex.Gravel(), new Color(0.75f, 0.75f, 0.75f));
-            Asphalt = Mats.Tex(Tex.Asphalt(), Color.white, 0.25f);
-            Sidewalk = Mats.Tex(Tex.Tiles("sidewalk", new Color(0.66f, 0.65f, 0.62f), new Color(0.45f, 0.45f, 0.44f), 8), Color.white);
-            Plaza = Mats.Tex(Tex.Tiles("plaza", new Color(0.78f, 0.74f, 0.68f), new Color(0.55f, 0.52f, 0.5f), 4), Color.white);
-            Concrete = Mats.Tex(Tex.Noisy("concrete", new Color(0.55f, 0.55f, 0.53f), new Color(0.65f, 0.65f, 0.63f), 0.1f, 0.05f), Color.white);
-            Curbside = Mats.Lit(new Color(0.6f, 0.6f, 0.58f));
-            Grass = Mats.Tex(Tex.Grass(), Color.white, 0.05f);
-            Sand = Mats.Tex(Tex.Sand(), Color.white, 0.05f);
+            Roof = Photo.Mat("gravel_concrete", new Color(0.85f, 0.85f, 0.85f), 0.1f);
+            Asphalt = Photo.Mat("asphalt_02", new Color(0.82f, 0.82f, 0.84f), 0.25f);
+            Sidewalk = Photo.Mat("concrete_tiles_02", new Color(1.05f, 1.05f, 1.03f), 0.18f);
+            Plaza = Photo.Mat("granite_tile", Color.white, 0.3f);
+            Concrete = Photo.Mat("painted_concrete", new Color(0.9f, 0.9f, 0.88f), 0.15f);
+            Curbside = Photo.Mat("concrete_wall_003", new Color(0.85f, 0.85f, 0.85f), 0.1f);
+            Grass = Photo.Mat("aerial_grass_rock", new Color(0.62f, 0.85f, 0.45f), 0.05f);
+            Sand = Photo.Mat("sand_01", new Color(1.05f, 1.0f, 0.92f), 0.05f);
             Rock = Mats.Tex(Tex.Rock(), Color.white, 0.1f);
             Water = Mats.Glass(new Color(0.12f, 0.42f, 0.55f, 0.85f));
             Water.mainTexture = Tex.Water();
@@ -70,10 +73,10 @@ namespace Gad
             PaintYellow = Mats.Lit(new Color(0.95f, 0.75f, 0.15f));
             DoorGlass = Mats.Lit(new Color(0.12f, 0.16f, 0.2f), 0.9f);
             Frame = Mats.Lit(new Color(0.22f, 0.23f, 0.25f), 0.5f, 0.6f);
-            RoofTiles = Mats.Tex(Tex.Tiles("rooftiles", new Color(0.55f, 0.22f, 0.16f), new Color(0.35f, 0.14f, 0.1f), 8), Color.white);
+            RoofTiles = Photo.Mat("clay_roof_tiles_02", Color.white, 0.2f);
             LampGlow = new Material(Mats.Glow(Color.white)) { color = new Color(0.9f, 0.9f, 0.85f) };
             WindowGlass = Mats.Lit(new Color(0.35f, 0.5f, 0.6f), 0.95f);
-            Wood = Mats.Tex(Tex.Wood(), Color.white, 0.2f);
+            Wood = Photo.Mat("oak_veneer_01", Color.white, 0.35f);
             Metal = Mats.Lit(new Color(0.6f, 0.62f, 0.65f), 0.6f, 0.8f);
         }
 
@@ -144,18 +147,52 @@ namespace Gad
             {
                 case BType.House:
                 {
-                    m.Box(face, null, new Vector3(x0, y0, z0), new Vector3(x1, y0 + h, z1), new Vector2(7f, 6.6f), off);
-                    Gable(m, x0, z0, x1, z1, y0 + h, 2.6f, RoofTiles, face);
+                    m.Box(face, null, new Vector3(x0, y0, z0), new Vector3(x1, y0 + h, z1), Tile, off);
+                    Gable(m, x0, z0, x1, z1, y0 + h, 2.6f, RoofTiles, Facade[b.style]);
+                    // eaves boards and a chimney
+                    m.Box(Paint, Paint, new Vector3(x0 - 0.5f, y0 + h - 0.32f, z0 - 0.5f), new Vector3(x1 + 0.5f, y0 + h - 0.12f, z0 - 0.3f), new Vector2(4, 4));
+                    m.Box(Paint, Paint, new Vector3(x0 - 0.5f, y0 + h - 0.32f, z1 + 0.3f), new Vector3(x1 + 0.5f, y0 + h - 0.12f, z1 + 0.5f), new Vector2(4, 4));
+                    m.Box(Curbside, Curbside, new Vector3(x1 - 2.2f, y0 + h, (z0 + z1) / 2 + 1), new Vector3(x1 - 1.4f, y0 + h + 3.2f, (z0 + z1) / 2 + 1.8f), new Vector2(2, 2));
                     break;
                 }
                 case BType.Villa:
                 {
-                    m.Box(face, Roof, new Vector3(x0, y0, z0), new Vector3(x1, y0 + h, z1), Tile, off);
-                    float wx = (x1 - x0) * 0.5f;
-                    m.Box(face, Roof, new Vector3(x1 - 0.01f, y0, z0 + 2), new Vector3(x1 + 0.01f + Mathf.Min(wx, 6f), y0 + 3.4f, z1 - 4), Tile, off);
-                    Parapet(m, x0, z0, x1, z1, y0 + h, Paint);
-                    // terrace slab
-                    m.Box(Paint, Plaza, new Vector3(x0 - 1.5f, y0, z0 - 3f), new Vector3(x1 + 1.5f, y0 + 0.25f, z0), new Vector2(4, 4));
+                    // modern villa: glass ground floor, a cantilevered upper volume clad in wood, white roof slabs
+                    float dir = b.front == 0 ? -1 : 1;                     // towards the street
+                    float zf = b.front == 0 ? z0 : z1, zb = b.front == 0 ? z1 : z0;
+                    float w = x1 - x0, g = 3.4f, u = 3.3f;
+                    var slab = Photo.Mat("white_plaster_02", new Color(1.08f, 1.08f, 1.06f), 0.25f);
+                    var glassRail = Mats.Glass(new Color(0.6f, 0.75f, 0.8f, 0.3f));
+                    Vector3 V(float x, float y, float z) => new Vector3(x, y, z);
+                    float Zmin(float a1, float a2) => Mathf.Min(a1, a2); float Zmax(float a1, float a2) => Mathf.Max(a1, a2);
+                    // ground floor
+                    m.Box(face, null, V(x0, y0, z0), V(x1, y0 + g, z1), Tile, off);
+                    m.Box(slab, slab, V(x0 - 0.5f, y0 + g, Zmin(zf, zb) - 0.5f), V(x1 + 0.5f, y0 + g + 0.35f, Zmax(zf, zb) + 0.5f), new Vector2(4, 4), default, true);
+                    // upper volume, pushed 2.6 m out over the terrace
+                    float ux0 = x0 + w * 0.28f, ux1 = x1 + 1.2f;
+                    float uzf = zf + dir * 2.6f, uzb = zb - dir * 2.5f;
+                    m.uvYStart = 3.3f;
+                    m.Box(Facade[6], null, V(ux0, y0 + g + 0.35f, Zmin(uzf, uzb)), V(ux1, y0 + g + 0.35f + u, Zmax(uzf, uzb)), Tile, off + new Vector2(0.25f, 0));
+                    m.uvYStart = 0;
+                    m.Box(slab, slab, V(ux0 - 0.4f, y0 + g + 0.35f + u, Zmin(uzf, uzb) - 0.4f), V(ux1 + 0.4f, y0 + g + 0.35f + u + 0.35f, Zmax(uzf, uzb) + 0.4f), new Vector2(4, 4), default, true);
+                    // slim steel posts under the overhang
+                    foreach (float px in new[] { ux0 + 0.3f, ux1 - 0.3f })
+                        m.Box(Frame, Frame, V(px - 0.08f, y0, uzf - dir * 0.35f - 0.08f), V(px + 0.08f, y0 + g + 0.35f, uzf - dir * 0.35f + 0.08f), new Vector2(1, 1));
+                    // glass railing round the free part of the ground-floor roof (a terrace)
+                    float ry = y0 + g + 0.35f;
+                    m.Box(glassRail, glassRail, V(x0 - 0.45f, ry, zf + dir * 0.45f - 0.03f), V(ux0, ry + 1.05f, zf + dir * 0.45f + 0.03f), new Vector2(4, 4));
+                    m.Box(glassRail, glassRail, V(x0 - 0.48f, ry, Zmin(zf, zb)), V(x0 - 0.42f, ry + 1.05f, Zmax(zf, zb)), new Vector2(4, 4));
+                    m.Box(Frame, Frame, V(x0 - 0.47f, ry + 1.03f, Zmin(zf, zb)), V(x0 - 0.43f, ry + 1.08f, Zmax(zf, zb)), new Vector2(1, 1));
+                    // garage door and wall lights
+                    float gx0 = x1 - 4.6f, gx1 = x1 - 0.6f;
+                    m.Box(Frame, Frame, V(gx0, y0, zf + dir * 0.06f - 0.03f), V(gx1, y0 + 2.6f, zf + dir * 0.06f + 0.03f), new Vector2(1, 1));
+                    for (float gy = y0 + 0.3f; gy < y0 + 2.6f; gy += 0.32f)
+                        m.Box(Curbside, Curbside, V(gx0 + 0.05f, gy, zf + dir * 0.1f - 0.01f), V(gx1 - 0.05f, gy + 0.03f, zf + dir * 0.1f + 0.01f), new Vector2(1, 1));
+                    foreach (float lx in new[] { b.door.x - 1.9f, b.door.x + 1.9f, gx0 - 0.4f })
+                        m.Box(LampGlow, LampGlow, V(lx - 0.1f, y0 + 2.1f, zf + dir * 0.08f - 0.04f), V(lx + 0.1f, y0 + 2.4f, zf + dir * 0.08f + 0.04f), new Vector2(1, 1));
+                    // terrace deck
+                    var deck = Photo.Mat("wood_floor_deck", Color.white, 0.2f);
+                    m.Box(Paint, deck, V(x0 - 1.5f, y0, Zmin(zf, zf + dir * 3.2f)), V(x1 + 1.5f, y0 + 0.22f, Zmax(zf, zf + dir * 3.2f)), new Vector2(4, 4));
                     break;
                 }
                 case BType.Tower:
@@ -228,6 +265,7 @@ namespace Gad
                     else
                         m.Box(face, Roof, new Vector3(x0, y0, z0), new Vector3(x1, y0 + h, z1), Tile, off);
                     Parapet(m, x0, z0, x1, z1, y0 + h, b.style == 2 ? Concrete : Paint);
+                    if (b.type == BType.Apartment) Balconies(m, b, x0, z0, x1, z1, y0, h);
                     if ((b.type == BType.Office || b.type == BType.Hotel || b.type == BType.Bank) && (b.district == District.Downtown || b.district == District.Business) && h > 18)
                         FutureCity.Outline(m, b, x0, z0, x1, z1, y0, y0 + h);
                     // rooftop units
@@ -245,6 +283,43 @@ namespace Gad
                 }
             }
             Door(m, b);
+        }
+
+        static Material balconyGlass, balconySlab;
+
+        /// <summary>Balconies on the street side of a block of flats, lined up with the windows of the facade texture.</summary>
+        static void Balconies(MeshB m, Bld b, float x0, float z0, float x1, float z1, float y0, float h)
+        {
+            balconyGlass ??= Mats.Glass(new Color(0.55f, 0.7f, 0.78f, 0.32f));
+            balconySlab ??= Photo.Mat("white_plaster_02", new Color(0.95f, 0.95f, 0.93f), 0.2f);
+            float len = b.front <= 1 ? x1 - x0 : z1 - z0;
+            int bays = Mathf.FloorToInt(len / 3.5f);
+            int floors = Mathf.FloorToInt(h / 3.3f);
+            for (int f = 1; f < floors; f++)
+                for (int k = 0; k < bays; k++)
+                {
+                    if ((k + f + b.id) % 2 == 1) continue;
+                    float u = (k + 0.5f) * 3.5f;                       // along the facade, from where its texture starts
+                    float y = y0 + f * 3.3f;
+                    // facade local: x along, z out of the wall
+                    Vector3 P(float along, float yy, float outw) => b.front switch
+                    {
+                        0 => new Vector3(x0 + along, yy, z0 - outw),
+                        1 => new Vector3(x1 - along, yy, z1 + outw),
+                        2 => new Vector3(x0 - outw, yy, z1 - along),
+                        _ => new Vector3(x1 + outw, yy, z0 + along),
+                    };
+                    void Bx(Material mat, float a0, float a1, float yb, float yt, float o0, float o1)
+                    {
+                        var p = P(a0, yb, o0); var q = P(a1, yt, o1);
+                        m.Box(mat, mat, Vector3.Min(p, q), Vector3.Max(p, q), new Vector2(2, 2), default, true);
+                    }
+                    Bx(balconySlab, u - 1.5f, u + 1.5f, y - 0.05f, y + 0.12f, 0f, 1.15f);
+                    Bx(balconyGlass, u - 1.48f, u + 1.48f, y + 0.12f, y + 1.1f, 1.1f, 1.14f);
+                    Bx(balconyGlass, u - 1.5f, u - 1.46f, y + 0.12f, y + 1.1f, 0f, 1.12f);
+                    Bx(balconyGlass, u + 1.46f, u + 1.5f, y + 0.12f, y + 1.1f, 0f, 1.12f);
+                    Bx(Frame, u - 1.5f, u + 1.5f, y + 1.08f, y + 1.13f, 1.08f, 1.16f);
+                }
         }
 
         /// <summary>A coloured band on the front facade (shop signs).</summary>

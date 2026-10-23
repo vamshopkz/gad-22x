@@ -223,23 +223,23 @@ namespace Gad
                         h = r.F(24, 60); style = r.Chance(0.5f) ? 3 : 0; break;
                     case BType.Apartment:
                         fp = Shrink(lot, front, set, 1.5f, new Vector2(r.F(18, 24), r.F(14, 20)));
-                        h = 3.3f * r.I(5) + 13.2f; style = r.Chance(0.5f) ? 1 : 2; break;
+                        h = 3.3f * r.I(5) + 13.2f; style = r.I(3) switch { 0 => 1, 1 => 2, _ => 9 }; break;
                     case BType.House:
                         fp = Shrink(lot, front, 2f, 6f, new Vector2(r.F(9, 13), r.F(9, 12)));
-                        h = r.Chance(0.5f) ? 3.4f : 6.6f; style = 6; break;
+                        h = r.Chance(0.5f) ? 3.4f : 6.6f; style = r.Chance(0.5f) ? 1 : 9; break;
                     case BType.Villa:
                         fp = Shrink(lot, front, 2f, 12f, new Vector2(r.F(14, 17), r.F(14, 20)));
-                        h = 6.8f; style = 3; break;
+                        h = 6.8f; style = 6; break;
                     case BType.Mall:
                         fp = Shrink(lot, front, 4, 2f, new Vector2(52, 44)); h = 16f; style = 4; break;
                     case BType.Hospital:
                         fp = Shrink(lot, front, 4, 4f, new Vector2(46, 30)); h = 23.1f; style = 3; break;
                     case BType.University:
-                        fp = Shrink(lot, front, 4, 4f, new Vector2(48, 30)); h = 19.8f; style = 2; break;
+                        fp = Shrink(lot, front, 4, 4f, new Vector2(48, 30)); h = 19.8f; style = 8; break;
                     case BType.CarDealer:
                         fp = Shrink(lot, front, 4, 14f, new Vector2(40, 26)); h = 8f; style = 4; break;
                     case BType.Station:
-                        fp = Shrink(lot, front, 4, 4f, new Vector2(50, 24)); h = 14f; style = 2; break;
+                        fp = Shrink(lot, front, 4, 4f, new Vector2(50, 24)); h = 14f; style = 8; break;
                     case BType.Port:
                         fp = Shrink(lot, front, 4, 4f, new Vector2(30, 20)); h = 10f; style = 5; break;
                     case BType.Factory: case BType.Warehouse:
@@ -252,9 +252,9 @@ namespace Gad
                     case BType.Parking:
                         fp = Shrink(lot, front, 2, 2f, new Vector2(20, 18)); h = 4.4f; style = 3; break;
                     case BType.Hotel:
-                        fp = Shrink(lot, front, set, 1.5f, new Vector2(r.F(20, 26), r.F(16, 22))); h = 3.3f * (6 + r.I(10)); style = r.Chance(0.5f) ? 2 : 3; break;
+                        fp = Shrink(lot, front, set, 1.5f, new Vector2(r.F(20, 26), r.F(16, 22))); h = 3.3f * (6 + r.I(10)); style = r.Chance(0.5f) ? 8 : 3; break;
                     case BType.Bank: case BType.JobCenter: case BType.Library: case BType.School: case BType.FireStation:
-                        fp = Shrink(lot, front, 2, 2f, new Vector2(24, 18)); h = t == BType.FireStation ? 8f : 3.3f * (3 + r.I(3)); style = t == BType.Bank ? 7 : t == BType.Library ? 2 : 3; break;
+                        fp = Shrink(lot, front, 2, 2f, new Vector2(24, 18)); h = t == BType.FireStation ? 8f : 3.3f * (3 + r.I(3)); style = t == BType.Bank || t == BType.Library ? 8 : 3; break;
                     case BType.Restaurant: case BType.Cafe: case BType.Shop: case BType.Clothes: case BType.Furniture: case BType.Gym: case BType.Supermarket:
                     default:
                         bool small = t == BType.Cafe || t == BType.Shop;

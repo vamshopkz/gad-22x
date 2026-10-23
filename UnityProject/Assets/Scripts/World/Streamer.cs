@@ -184,8 +184,10 @@ namespace Gad
         static void Mats0()
         {
             if (trunk != null) return;
-            trunk = Mats.Lit(new Color(0.38f, 0.27f, 0.18f));
-            leafA = Mats.Lit(new Color(0.2f, 0.45f, 0.18f)); leafB = Mats.Lit(new Color(0.28f, 0.52f, 0.2f)); leafC = Mats.Lit(new Color(0.16f, 0.38f, 0.2f));
+            trunk = Photo.Mat("dark_wood", new Color(0.55f, 0.45f, 0.38f), 0.1f);
+            leafA = Photo.Mat("aerial_grass_rock", new Color(0.38f, 0.62f, 0.3f), 0.08f, 1.6f);
+            leafB = Photo.Mat("aerial_grass_rock", new Color(0.48f, 0.7f, 0.32f), 0.08f, 1.6f);
+            leafC = Photo.Mat("aerial_grass_rock", new Color(0.3f, 0.5f, 0.3f), 0.08f, 1.6f);
             benchMat = WorldBuilder.Wood;
             binMat = Mats.Lit(new Color(0.2f, 0.35f, 0.25f));
             poleMat = Mats.Lit(new Color(0.22f, 0.23f, 0.25f), 0.5f, 0.6f);
@@ -334,13 +336,48 @@ namespace Gad
             }
         }
 
+        static Mesh[] crowns;
+
+        /// <summary>Lumpy leaf clusters: a sphere pushed in and out by noise (looks like foliage, not a ball).</summary>
+        static Mesh Crown(int v)
+        {
+            if (crowns == null) crowns = new Mesh[4];
+            if (crowns[v] != null) return crowns[v];
+            var src = Prim.MeshOf(PrimitiveType.Sphere);
+            var verts = src.vertices;
+            var uv = new Vector2[verts.Length];
+            for (int i = 0; i < verts.Length; i++)
+            {
+                var d = verts[i].normalized;
+                float n = Mathf.PerlinNoise(d.x * 2.3f + v * 7, d.z * 2.3f + d.y * 1.7f + v * 3) * 0.55f
+                        + Mathf.PerlinNoise(d.x * 6f + v, d.y * 6f + d.z * 6f) * 0.25f;
+                verts[i] = d * (0.36f + n * 0.32f);
+                if (verts[i].y < -0.05f) verts[i].y *= 0.55f;          // flatter underside
+                uv[i] = new Vector2(Mathf.Atan2(d.z, d.x) * 0.8f, d.y * 1.2f);
+            }
+            var m = new Mesh { name = "crown" + v, vertices = verts, triangles = src.triangles, uv = uv };
+            m.RecalculateNormals(); m.RecalculateBounds();
+            crowns[v] = m;
+            return m;
+        }
+
         static void Tree(MeshB m, Vector3 p, Rng r, float scale)
         {
             float s = scale * r.F(0.8f, 1.25f);
-            M(m, PrimitiveType.Cylinder, p + Vector3.up * 1.4f * s, new Vector3(0.28f, 1.4f, 0.28f) * s, trunk);
+            M(m, PrimitiveType.Cylinder, p + Vector3.up * 1.6f * s, new Vector3(0.24f, 1.6f, 0.24f) * s, trunk);
+            // two branches
+            m.Add(Prim.MeshOf(PrimitiveType.Cylinder), Matrix4x4.TRS(p + new Vector3(0.35f, 3.1f, 0) * s, Quaternion.Euler(0, 0, -35), new Vector3(0.12f, 0.6f, 0.12f) * s), trunk);
+            m.Add(Prim.MeshOf(PrimitiveType.Cylinder), Matrix4x4.TRS(p + new Vector3(-0.3f, 3.3f, 0.2f) * s, Quaternion.Euler(20, 0, 30), new Vector3(0.11f, 0.55f, 0.11f) * s), trunk);
             var leaf = r.I(3) switch { 0 => leafA, 1 => leafB, _ => leafC };
-            M(m, PrimitiveType.Sphere, p + Vector3.up * 3.6f * s, new Vector3(3f, 2.6f, 3f) * s, leaf);
-            M(m, PrimitiveType.Sphere, p + new Vector3(0.6f, 4.5f, 0.3f) * s, new Vector3(2f, 1.8f, 2f) * s, leaf);
+            int k = 4 + r.I(3);
+            for (int i = 0; i < k; i++)
+            {
+                float a = i / (float)k * 360f + r.F(0, 40);
+                var off = Quaternion.Euler(0, a, 0) * new Vector3(r.F(0.5f, 1.1f), r.F(-0.3f, 0.9f), 0);
+                if (i == 0) off = new Vector3(0, 1.0f, 0);
+                float cs = r.F(1.9f, 2.8f);
+                m.Add(Crown(r.I(4)), Matrix4x4.TRS(p + (Vector3.up * 4.2f + off) * s, Quaternion.Euler(r.F(-15, 15), r.F(0, 360), 0), new Vector3(cs, cs * 0.85f, cs) * s), leaf);
+            }
         }
 
         static void Bench(MeshB m, Vector3 p, float yaw)
