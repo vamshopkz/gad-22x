@@ -223,6 +223,37 @@ namespace Gad
                 Lamp(m, new Vector3(X0 + 7.2f, y, s), 270); Col(new Vector3(X0 + 7.2f, 3, s), new Vector3(0.3f, 6, 0.3f));
                 Lamp(m, new Vector3(X1 - 7.2f, y, s), 90); Col(new Vector3(X1 - 7.2f, 3, s), new Vector3(0.3f, 6, 0.3f));
             }
+            // road signs and bollards at the corners
+            var signRed = Mats.Lit(new Color(0.8f, 0.08f, 0.08f), 0.4f); var signBlue = Mats.Lit(new Color(0.1f, 0.3f, 0.75f), 0.4f); var signWhite = Mats.Lit(new Color(0.95f, 0.95f, 0.95f), 0.4f);
+            foreach (var (cx, cz, yaw) in new[] { (X0 + 6.6f, Z1 - 6.6f, 0f), (X1 - 6.6f, Z0 + 6.6f, 180f), (X1 - 6.6f, Z1 - 6.6f, 90f) })
+            {
+                var sp = new Vector3(cx, y, cz);
+                M(m, PrimitiveType.Cylinder, sp + Vector3.up * 1.3f, new Vector3(0.07f, 1.3f, 0.07f), poleMat);
+                var rot = Quaternion.Euler(0, yaw, 0);
+                int kind = H.R(3, bx, bz, (int)yaw);
+                if (kind == 0)
+                {   // speed limit: white disc with red rim
+                    m.Add(Prim.MeshOf(PrimitiveType.Cylinder), Matrix4x4.TRS(sp + Vector3.up * 2.45f, rot * Quaternion.Euler(90, 0, 0), new Vector3(0.62f, 0.02f, 0.62f)), signRed);
+                    m.Add(Prim.MeshOf(PrimitiveType.Cylinder), Matrix4x4.TRS(sp + Vector3.up * 2.45f + rot * new Vector3(0, 0, -0.022f), rot * Quaternion.Euler(90, 0, 0), new Vector3(0.48f, 0.01f, 0.48f)), signWhite);
+                }
+                else if (kind == 1)
+                {   // pedestrian crossing: blue square with a white triangle
+                    m.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(sp + Vector3.up * 2.45f, rot, new Vector3(0.6f, 0.6f, 0.03f)), signBlue);
+                    m.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(sp + Vector3.up * 2.42f + rot * new Vector3(0, 0, -0.02f), rot * Quaternion.Euler(0, 0, 45), new Vector3(0.3f, 0.3f, 0.01f)), signWhite);
+                }
+                else
+                {   // no-entry: red disc with a white bar
+                    m.Add(Prim.MeshOf(PrimitiveType.Cylinder), Matrix4x4.TRS(sp + Vector3.up * 2.45f, rot * Quaternion.Euler(90, 0, 0), new Vector3(0.6f, 0.02f, 0.6f)), signRed);
+                    m.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(sp + Vector3.up * 2.45f + rot * new Vector3(0, 0, -0.022f), rot, new Vector3(0.42f, 0.1f, 0.01f)), signWhite);
+                }
+                // bollards along the corner
+                for (int k = 0; k < 4; k++)
+                {
+                    var bp = sp + rot * new Vector3(0.9f + k * 0.9f, 0, 0.6f);
+                    M(m, PrimitiveType.Cylinder, bp + Vector3.up * 0.45f, new Vector3(0.14f, 0.45f, 0.14f), poleMat);
+                    M(m, PrimitiveType.Cylinder, bp + Vector3.up * 0.8f, new Vector3(0.15f, 0.03f, 0.15f), FutureCity.NeonMat(0));
+                }
+            }
             // traffic light at the south-west crossroads corner
             TrafficLight(m, new Vector3(X0 + 6.8f, y, Z0 + 6.8f), (bx + bz) % 2 == 0);
             Col(new Vector3(X0 + 6.8f, 2.5f, Z0 + 6.8f), new Vector3(0.3f, 5, 0.3f));
@@ -257,6 +288,7 @@ namespace Gad
             {
                 Sign(go.transform, b);
                 AutoDoor.Make(go.transform, b);
+                BuildingDetail.Add(m, b, new Rng(H.U(b.id, 991)));
                 if ((b.type == BType.Tower || b.type == BType.Office || b.type == BType.Agency) && b.height > 28 && H.R(2, b.id, 21) == 0)
                 {
                     var side = Vector3.Cross(Vector3.up, b.FrontDir);

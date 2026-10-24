@@ -17,6 +17,13 @@ namespace Gad
             A(Slot.HGender, "hg_m", "Парень", "m", Color.white);
             A(Slot.HGender, "hg_f", "Девушка", "f", Color.white);
 
+            A(Slot.HFace, "hface_oval", "Овальное лицо", "0", Color.white);
+            A(Slot.HFace, "hface_round", "Круглое лицо", "1", Color.white);
+            A(Slot.HFace, "hface_square", "Квадратное, волевой подбородок", "2", Color.white);
+            A(Slot.HFace, "hface_long", "Вытянутое лицо", "3", Color.white);
+            A(Slot.HFace, "hface_heart", "Широкие скулы, узкий подбородок", "4", Color.white);
+            A(Slot.HFace, "hface_chubby", "Пухлые щёки", "5", Color.white, Rarity.Uncommon);
+
             A(Slot.HSkin, "hs_mannequin", "Манекен", "mannequin", new Color(0.9f, 0.9f, 0.9f));
             A(Slot.HSkin, "hs_light", "Светлая кожа", "skin", new Color(0.98f, 0.82f, 0.71f));
             A(Slot.HSkin, "hs_peach", "Персиковая", "skin", new Color(0.94f, 0.74f, 0.6f));
@@ -247,7 +254,8 @@ namespace Gad
             var skinDef = Wardrobe.Find(look.hSkin) ?? Wardrobe.Find("hs_light");
             bool mannequin = skinDef.style != "skin";
             Color skin = skinDef.color;
-            var h = BuildBody(holder.transform, female, skin, mannequin || skinDef.style == "gold", height * 1.08f);
+            int face = int.TryParse(Wardrobe.Find(look.hFace)?.style, out var fc) ? fc : 0;
+            var h = BuildBody(holder.transform, female, skin, mannequin || skinDef.style == "gold", height * 1.08f, face);
             if (skinDef.style == "gold") foreach (var r in holder.GetComponentsInChildren<Renderer>()) r.sharedMaterial = Mats.Shared("human_gold", () => Mats.Lit(skin, null, 0.75f, 0.85f));
             result.human = h;
             var ctx = new Dress { h = h, built = result, skin = skin, mannequin = mannequin };
@@ -926,14 +934,17 @@ namespace Gad
         {
             string key = $"{kind}_{ColorUtility.ToHtmlStringRGB(baseC)}_{ColorUtility.ToHtmlStringRGB(accent)}_{print}_{number}_{body}";
             if (texCache.TryGetValue(key, out var t)) return t;
-            const int W = 256, H = 256;
+            // 0.4: bodies at 512 px with weave, seams, stitched hems, pockets and rivets
+            int W = body ? 512 : 256, H = W;
             t = new Texture2D(W, H, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Repeat, name = "cloth_" + key, anisoLevel = 2 };
             var px = new Color[W * H];
             var rnd = new System.Random(key.GetHashCode());
-            for (int y = 0; y < H; y++)
-                for (int x = 0; x < W; x++)
+            int k2 = W / 256;
+            for (int yh = 0; yh < H; yh++)
+                for (int xh = 0; xh < W; xh++)
                 {
-                    float u = x / (float)W, v = y / (float)H;
+                    int x = xh / k2, y = yh / k2;
+                    float u = xh / (float)W, v = yh / (float)H;
                     Color c = baseC;
                     float n = Mathf.PerlinNoise(x * 0.35f, y * 0.35f) * 0.06f - 0.03f;
                     switch (kind)
@@ -990,14 +1001,61 @@ namespace Gad
                             c = baseC * (1f + n + ((x + (y % 2)) % 2 == 0 ? 0.015f : -0.015f));
                             break;
                     }
-                    px[y * W + x] = c;
+                    // fine weave: threads crossing every pixel pair
+                    c *= 1f + (((xh + (yh >> 1)) & 1) == 0 ? 0.02f : -0.02f);
+                    px[yh * W + xh] = c;
                 }
+            if (body) Stitching(px, W, H, kind, baseC);
             if (body && (!string.IsNullOrEmpty(print) || number >= 0)) DrawPrint(px, W, H, print, accent, number);
             for (int i = 0; i < px.Length; i++) { var c = px[i]; px[i] = new Color(Mathf.Clamp01(c.r), Mathf.Clamp01(c.g), Mathf.Clamp01(c.b), 1f); }
             t.SetPixels(px);
             t.Apply(true);
             texCache[key] = t;
             return t;
+        }
+
+        /// <summary>Stitched hems and side seams for every garment; pockets and copper rivets for denim.</summary>
+        static void Stitching(Color[] px, int W, int H, string kind, Color baseC)
+        {
+            bool denim = kind == "denim" || kind == "ripped";
+            var thread = denim ? new Color(0.85f, 0.6f, 0.25f) : Color.Lerp(baseC, Color.white, 0.25f);
+            var seamShade = baseC * 0.72f;
+            void P(int x, int y, Color c) { if (y >= 0 && y < H) px[y * W + ((x % W) + W) % W] = c; }
+            void Dash(float u0, float v0, float u1, float v1)
+            {
+                int n = Mathf.CeilToInt(Mathf.Max(Mathf.Abs(u1 - u0) * W, Mathf.Abs(v1 - v0) * H));
+                for (int i = 0; i <= n; i++) if ((i / 3) % 2 == 0) P(Mathf.RoundToInt(Mathf.Lerp(u0, u1, i / (float)n) * W), Mathf.RoundToInt(Mathf.Lerp(v0, v1, i / (float)n) * H), thread);
+            }
+            void Seam(float u0, float v0, float u1, float v1)
+            {
+                int n = Mathf.CeilToInt(Mathf.Max(Mathf.Abs(u1 - u0) * W, Mathf.Abs(v1 - v0) * H));
+                for (int i = 0; i <= n; i++) P(Mathf.RoundToInt(Mathf.Lerp(u0, u1, i / (float)n) * W), Mathf.RoundToInt(Mathf.Lerp(v0, v1, i / (float)n) * H), seamShade);
+            }
+            // side seams (u 0 / 0.5) with a stitch line beside each
+            foreach (var su in new[] { 0f, 0.5f }) { Seam(su, 0, su, 1); Dash(su + 0.006f, 0, su + 0.006f, 1); }
+            // double-stitched hem at the bottom and a single line at the top
+            foreach (var hv in new[] { 0.025f, 0.04f }) Dash(0, hv, 1, hv);
+            Seam(0, 0.05f, 1, 0.05f);
+            Dash(0, 0.975f, 1, 0.975f);
+            if (!denim) return;
+            // back pockets (u 0.75 ± 0.07): outlined patches with a chevron, front pocket arcs, rivets
+            foreach (var cu in new[] { 0.69f, 0.81f })
+            {
+                Dash(cu - 0.045f, 0.82f, cu + 0.045f, 0.82f);
+                Dash(cu - 0.045f, 0.82f, cu - 0.04f, 0.6f); Dash(cu + 0.045f, 0.82f, cu + 0.04f, 0.6f);
+                Dash(cu - 0.04f, 0.6f, cu, 0.55f); Dash(cu, 0.55f, cu + 0.04f, 0.6f);
+                Dash(cu - 0.03f, 0.72f, cu, 0.68f); Dash(cu, 0.68f, cu + 0.03f, 0.72f);
+            }
+            foreach (var s in new[] { -1f, 1f })
+            {
+                float pu = 0.25f + s * 0.1f;
+                for (int i = 0; i <= 20; i++) { float a = i / 20f * Mathf.PI * 0.5f; P(Mathf.RoundToInt((pu - s * Mathf.Cos(a) * 0.05f) * W), Mathf.RoundToInt((0.95f - Mathf.Sin(a) * 0.2f) * H), seamShade); }
+                var rivet = new Color(0.78f, 0.5f, 0.28f);
+                int rx = Mathf.RoundToInt((pu + s * 0.05f) * W), ry = Mathf.RoundToInt(0.93f * H);
+                for (int dy = -2; dy <= 2; dy++) for (int dx = -2; dx <= 2; dx++) if (dx * dx + dy * dy <= 4) P(rx + dx, ry + dy, dx + dy < 0 ? rivet * 1.25f : rivet);
+            }
+            // fly stitching down the front
+            Dash(0.235f, 0.97f, 0.235f, 0.72f); Dash(0.235f, 0.72f, 0.25f, 0.68f);
         }
 
         /// <summary>A print on the chest (front at u = 0.25), and the number on the back too for sports tops.</summary>
@@ -1091,12 +1149,12 @@ namespace Gad
         static Texture2D ClothNormal()
         {
             if (clothN != null) return clothN;
-            const int S = 256;
+            const int S = 512;
             var h = new float[S * S];
             for (int y = 0; y < S; y++)
                 for (int x = 0; x < S; x++)
                 {
-                    float knit = Mathf.Sin(x * Mathf.PI * 2f * 64f / S) * 0.5f + 0.5f;
+                    float knit = Mathf.Sin(x * Mathf.PI * 2f * 128f / S) * 0.5f + 0.5f + (((x + (y >> 1)) & 1) == 0 ? 0.3f : 0f);
                     float creases = ProcTex.PeriodicNoise(x, y, S, 6, 3.1f) * 0.6f + ProcTex.PeriodicNoise(x, y, S, 12, 7.7f) * 0.4f;
                     float stretch = ProcTex.PeriodicNoise(x, y * 3 % S, S, 8, 1.9f);
                     h[y * S + x] = knit * 0.05f + creases * 0.7f + stretch * 0.25f;

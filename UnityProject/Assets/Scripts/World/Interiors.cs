@@ -326,6 +326,144 @@ namespace Gad
             Col(c + Vector3.up * 0.8f, new Vector3(Mathf.Abs(r.x), 1.5f, Mathf.Abs(r.z)), 12);
         }
 
+        // ------------------------------------------------------------------ clothing shop
+
+        static Material[] fabrics;
+        static Material Fabric(int i)
+        {
+            if (fabrics == null)
+            {
+                var photo = new[] { "denim_fabric", "velour_velvet", "brown_leather" };
+                fabrics = new Material[48];
+                for (int k = 0; k < fabrics.Length; k++)
+                    fabrics[k] = k % 4 == 1 ? Photo.Mat(photo[(k / 4) % photo.Length], Color.white, 0.12f, 1.2f)
+                        : Mats.Lit(Palette.Get(Palette.Cloth, k * 5 + 3), 0.12f);
+            }
+            return fabrics[Mathf.Abs(i) % fabrics.Length];
+        }
+
+        /// <summary>A garment on a hanger: a shirt with sleeves, a dress, or trousers.</summary>
+        static void Garment(Vector3 hook, Vector3 along, int kind, Material mat)
+        {
+            var rot = Quaternion.LookRotation(along) * Quaternion.Euler(0, 90, 0);   // faces across the rail
+            var chrome = WorldBuilder.Metal;
+            mb.Add(Prim.MeshOf(PrimitiveType.Cylinder), Matrix4x4.TRS(hook + Vector3.down * 0.05f, Quaternion.identity, new Vector3(0.01f, 0.05f, 0.01f)), chrome);
+            mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(hook + Vector3.down * 0.12f, rot, new Vector3(0.42f, 0.015f, 0.015f)), chrome);
+            if (kind == 0)
+            {   // shirt / tee: body + two sleeves + collar
+                mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(hook + Vector3.down * 0.46f, rot, new Vector3(0.46f, 0.66f, 0.045f)), mat);
+                foreach (float s in new[] { -1f, 1f })
+                    mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(hook + rot * new Vector3(s * 0.29f, -0.27f, 0), rot * Quaternion.Euler(0, 0, s * 35), new Vector3(0.14f, 0.3f, 0.04f)), mat);
+                mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(hook + Vector3.down * 0.15f, rot, new Vector3(0.16f, 0.05f, 0.05f)), mat);
+            }
+            else if (kind == 1)
+            {   // dress: a narrow top flaring into a skirt
+                mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(hook + Vector3.down * 0.36f, rot, new Vector3(0.34f, 0.42f, 0.05f)), mat);
+                mb.Add(Prim.MeshOf(PrimitiveType.Cylinder), Matrix4x4.TRS(hook + Vector3.down * 0.86f, rot * Quaternion.Euler(0, 0, 0), new Vector3(0.5f, 0.3f, 0.07f)), mat);
+            }
+            else
+            {   // trousers folded over the bar
+                foreach (float s in new[] { -1f, 1f })
+                    mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(hook + rot * new Vector3(s * 0.1f, -0.52f, 0), rot, new Vector3(0.18f, 0.78f, 0.05f)), mat);
+                mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(hook + Vector3.down * 0.16f, rot, new Vector3(0.4f, 0.08f, 0.055f)), mat);
+            }
+        }
+
+        /// <summary>A chrome clothes rail on two legs with a row of hanging garments.</summary>
+        static void Rack(Vector3 c, float len, bool alongX, int seed)
+        {
+            var r = new Rng((uint)seed * 7919u + 1);
+            var along = alongX ? Vector3.right : Vector3.forward;
+            var chrome = WorldBuilder.Metal;
+            foreach (float s in new[] { -0.5f, 0.5f })
+            {
+                var leg = c + along * s * len;
+                mb.Add(Prim.MeshOf(PrimitiveType.Cylinder), Matrix4x4.TRS(leg + Vector3.up * 0.8f, Quaternion.identity, new Vector3(0.04f, 0.8f, 0.04f)), chrome);
+                mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(leg + Vector3.up * 0.02f, Quaternion.LookRotation(along), new Vector3(0.5f, 0.04f, 0.06f)), chrome);
+            }
+            mb.Add(Prim.MeshOf(PrimitiveType.Cylinder), Matrix4x4.TRS(c + Vector3.up * 1.6f, Quaternion.FromToRotation(Vector3.up, along), new Vector3(0.035f, len / 2, 0.035f)), chrome);
+            int kind = r.I(3);
+            int n = Mathf.FloorToInt(len / 0.17f);
+            for (int i = 0; i < n; i++)
+            {
+                float u = -len / 2 + 0.12f + i * (len - 0.24f) / Mathf.Max(1, n - 1);
+                Garment(c + along * u + Vector3.up * 1.6f, along, kind, Fabric(seed * 3 + (i / 3)));
+            }
+            Col(c + Vector3.up * 0.8f, alongX ? new Vector3(len, 1.6f, 0.6f) : new Vector3(0.6f, 1.6f, len), 12);
+        }
+
+        /// <summary>Wall shelving with folded clothes, shoes or accessories.</summary>
+        static void Stock(Vector3 c, float len, bool alongX, int kind, int seed)
+        {
+            var r = new Rng((uint)seed * 31u + 5);
+            var along = alongX ? Vector3.right : Vector3.forward;
+            var depth = alongX ? Vector3.forward : Vector3.right;
+            var wood = WorldBuilder.Wood;
+            BoxM(c - along * len / 2 - depth * 0.25f, c + along * len / 2 + depth * 0.25f + Vector3.up * 0.04f, wood, true);
+            for (int lvl = 0; lvl < 4; lvl++)
+            {
+                float y = 0.35f + lvl * 0.5f;
+                BoxM(c - along * len / 2 - depth * 0.25f + Vector3.up * y, c + along * len / 2 + depth * 0.25f + Vector3.up * (y + 0.03f), wood);
+                for (float u = -len / 2 + 0.25f; u < len / 2 - 0.2f; u += kind == 1 ? 0.32f : 0.45f)
+                {
+                    var p = c + along * u + Vector3.up * (y + 0.03f);
+                    if (kind == 0)
+                    {   // a stack of folded clothes
+                        int h = 2 + r.I(4);
+                        for (int k = 0; k < h; k++)
+                            mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(p + Vector3.up * (0.035f + k * 0.07f), Quaternion.LookRotation(depth) * Quaternion.Euler(0, r.F(-4, 4), 0), new Vector3(0.34f, 0.065f, 0.28f)), Fabric(seed + (int)(u * 10) + lvl));
+                    }
+                    else if (kind == 1)
+                    {   // a pair of shoes
+                        var sc = Mats.Lit(Palette.Get(Palette.Cloth, r.I(14)), 0.4f);
+                        foreach (float s in new[] { -0.06f, 0.06f })
+                        {
+                            var q = p + along * s;
+                            mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(q + Vector3.up * 0.015f, Quaternion.LookRotation(depth), new Vector3(0.1f, 0.03f, 0.27f)), Mats.Lit(new Color(0.92f, 0.92f, 0.9f), 0.3f));
+                            mb.Add(Prim.MeshOf(PrimitiveType.Sphere), Matrix4x4.TRS(q + Vector3.up * 0.07f + depth * 0.02f, Quaternion.LookRotation(depth), new Vector3(0.1f, 0.1f, 0.25f)), sc);
+                        }
+                    }
+                    else
+                    {   // accessories: caps, sunglasses, bags
+                        int a = r.I(3);
+                        if (a == 0) { var cm = Mats.Lit(Palette.Get(Palette.Cloth, r.I(14)), 0.2f); mb.Add(Prim.MeshOf(PrimitiveType.Sphere), Matrix4x4.TRS(p + Vector3.up * 0.06f, Quaternion.identity, new Vector3(0.2f, 0.14f, 0.22f)), cm); mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(p + Vector3.up * 0.015f - depth * 0.13f, Quaternion.LookRotation(depth), new Vector3(0.18f, 0.01f, 0.1f)), cm); }
+                        else if (a == 1) { var g = Mats.Lit(new Color(0.05f, 0.05f, 0.06f), 0.9f); foreach (float s in new[] { -0.045f, 0.045f }) mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(p + along * s + Vector3.up * 0.04f, Quaternion.LookRotation(depth), new Vector3(0.075f, 0.045f, 0.01f)), g); mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(p + Vector3.up * 0.05f, Quaternion.LookRotation(depth), new Vector3(0.17f, 0.008f, 0.01f)), g); }
+                        else { var bm = Photo.Mat(r.Chance(0.5f) ? "brown_leather" : "leather_white", Color.white, 0.4f); mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(p + Vector3.up * 0.13f, Quaternion.LookRotation(depth), new Vector3(0.3f, 0.24f, 0.12f)), bm); mb.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(p + Vector3.up * 0.3f, Quaternion.LookRotation(depth), new Vector3(0.2f, 0.1f, 0.02f)), bm); }
+                    }
+                }
+            }
+            Col(c + Vector3.up * 1.1f, alongX ? new Vector3(len, 2.2f, 0.5f) : new Vector3(0.5f, 2.2f, len), 12);
+        }
+
+        /// <summary>A white shop mannequin wearing a ready-made look.</summary>
+        static void Mannequin(Vector3 local, float yaw, int seed)
+        {
+            var preset = Menus.SkinPresets[Mathf.Abs(seed) % Menus.SkinPresets.Length].look.Clone();
+            preset.hSkin = "hs_mannequin"; preset.hHair = "hh_none"; preset.hEyes = "he_none"; preset.hMouth = "hm_none";
+            var p = Person.Create(Ctr, preset, "Mannequin");
+            p.transform.localPosition = local + Vector3.up * 0.12f;
+            p.transform.localRotation = Quaternion.Euler(0, yaw, 0);
+            p.enabled = false;
+            var an = p.GetComponentInChildren<HumanAnimator>();
+            if (an != null) an.enabled = false;
+            Mesh(PrimitiveType.Cylinder, local + Vector3.up * 0.06f, new Vector3(0.5f, 0.06f, 0.5f), new Color(0.15f, 0.15f, 0.17f));
+        }
+
+        /// <summary>A full clothing shop in a w x d area (centre of the near edge at c, facing +z).</summary>
+        static void ClothingShop(Vector3 c, float w, float d, int seed)
+        {
+            // racks in rows
+            int racks = Mathf.Max(1, Mathf.FloorToInt((w - 2) / 3.2f));
+            for (int i = 0; i < racks; i++)
+                for (int j = 0; j < Mathf.Max(1, Mathf.FloorToInt((d - 4) / 2.6f)); j++)
+                    Rack(c + new Vector3(-w / 2 + 1.8f + i * 3.2f, 0, 2.6f + j * 2.6f), 2.3f, true, seed + i * 5 + j);
+            // shelving on the back wall: folded clothes, shoes, accessories
+            float seg = w / 3f;
+            for (int k = 0; k < 3; k++) Stock(c + new Vector3(-w / 2 + seg * (k + 0.5f), 0, d - 0.35f), seg - 0.3f, true, k, seed + k);
+            // mannequins near the entrance
+            for (int k = 0; k < Mathf.Min(4, racks + 1); k++) Mannequin(c + new Vector3(-w / 2 + 1.2f + k * (w - 2.4f) / Mathf.Max(1, Mathf.Min(4, racks + 1) - 1), 0, 1.1f), 180 + (k - 1.5f) * 15, seed + k);
+        }
+
         // ------------------------------------------------------------------ layouts
 
         public static void Build(Bld b, int unit)
@@ -452,7 +590,8 @@ namespace Gad
                         Sign(new Vector3(x, 4.6f, D - 6.1f), stores[i].title, stores[i].col, 6);
                         var act = stores[i].act;
                         Point(new Vector3(x, 0, D - 7.2f), stores[i].title, act);
-                        Shelf(new Vector3(x, 0, D - 3), 6, true, b.id + i);
+                        if (i == 0) { Rack(new Vector3(x - 1.7f, 0, D - 3.2f), 2.6f, true, b.id); Rack(new Vector3(x + 1.7f, 0, D - 3.2f), 2.6f, true, b.id + 1); Stock(new Vector3(x, 0, D - 0.4f), 7f, true, i % 3, b.id); Mannequin(new Vector3(x + 3.2f, 0, D - 7.6f), 200, b.id); }
+                        else Shelf(new Vector3(x, 0, D - 3), 6, true, b.id + i);
                         Npc(new Vector3(x + 2, 0, D - 7), 180, b.id * 7 + i);
                     }
                     // fountain and benches
@@ -628,16 +767,21 @@ namespace Gad
                     break;
 
                 case BType.Clothes:
-                    Room(16, 12, 4f, wood, new Color(0.95f, 0.9f, 0.92f));
+                    Room(18, 15, 4f, wood, new Color(0.97f, 0.95f, 0.93f));
+                    ClothingShop(new Vector3(0, 0, 0.6f), 16f, 13f, b.id);
+                    // fitting rooms with curtains on the right wall
                     for (int k = 0; k < 3; k++)
                     {
-                        var p = new Vector3(-5 + k * 5, 0, 6);
-                        BoxM(p + new Vector3(-1.5f, 1.6f, -0.03f), p + new Vector3(1.5f, 1.65f, 0.03f), WorldBuilder.Metal);
-                        for (int c = 0; c < 8; c++) Box(p + new Vector3(-1.4f + c * 0.36f, 0.7f, -0.25f), p + new Vector3(-1.2f + c * 0.36f, 1.6f, 0.25f), Palette.Get(Palette.Cloth, c + k * 3));
+                        float z = 3.5f + k * 1.6f;
+                        Box(new Vector3(7.6f, 0, z - 0.75f), new Vector3(9f, 2.4f, z - 0.7f), new Color(0.9f, 0.9f, 0.88f), true);
+                        BoxM(new Vector3(7.55f, 0.1f, z - 0.7f), new Vector3(7.6f, 2.3f, z + 0.7f), Fabric(k + 3));
                     }
-                    Box(new Vector3(5, 0, 10.5f), new Vector3(7, 2.4f, 10.6f), new Color(0.8f, 0.9f, 0.95f));
-                    Npc(new Vector3(-6, 0, 10), 150, b.id, 0);
-                    Point(new Vector3(0, 0, 3.5f), "ПРИМЕРОЧНАЯ: КУПИТЬ ОДЕЖДУ", () => Menus.Dress(true));
+                    Box(new Vector3(7.6f, 0, 8.65f), new Vector3(9f, 2.4f, 8.7f), new Color(0.9f, 0.9f, 0.88f), true);
+                    Counter(new Vector3(-6.5f, 0, 3f), 2.4f, new Color(0.15f, 0.15f, 0.17f), false);
+                    Npc(new Vector3(-7.6f, 0, 3f), 90, b.id, 0);
+                    Point(new Vector3(6.6f, 0, 5.1f), "ПРИМЕРОЧНАЯ: ПРИМЕРИТЬ И КУПИТЬ", () => Menus.Dress(true));
+                    Point(new Vector3(-5.2f, 0, 3f), "КАССА: ГОТОВЫЕ ОБРАЗЫ (СКИНЫ)", () => Menus.Skins());
+                    Sign(new Vector3(0, 3.4f, 14.6f), b.name, b.Info.Sign, 5);
                     break;
 
                 case BType.Furniture:
@@ -720,7 +864,7 @@ namespace Gad
                     Sofa(new Vector3(9, 0, 4), 270, new Color(0.9f, 0.9f, 0.92f)); Sofa(new Vector3(-6, 0, 4), 90, new Color(0.9f, 0.9f, 0.92f));
                     for (int k = 0; k < 4; k++) Npc(new Vector3(-4 + k * 3, 0, 6 + (k % 2) * 2), k * 90, b.id + 40 + k, 0);
                     Plant(new Vector3(-13.5f, 0, 20.5f), 1.4f); Plant(new Vector3(13.5f, 0, 1.5f), 1.4f);
-                    Sign(new Vector3(0, 5.6f, 21.8f), "ГАД СИТИ · НЕДВИЖИМОСТЬ", new Color(0.2f, 0.9f, 1f), 7);
+                    Sign(new Vector3(0, 5.6f, 21.8f), "GOD CITY · НЕДВИЖИМОСТЬ", new Color(0.2f, 0.9f, 1f), 7);
                     Sign(new Vector3(EX, 3.4f, 21.85f), "ЛИФТ · 20 ЭТАЖЕЙ", Color.white, 2.5f);
                     for (int k = 0; k < 3; k++) Point(new Vector3(-8 + k * 8, 0, 16.2f), "АГЕНТ: КУПИТЬ ЖИЛЬЁ", () => Menus.RealEstate());
                     Point(new Vector3(2, 0, 6), "МАКЕТ ГОРОДА: ВСЁ ЖИЛЬЁ", () => Menus.RealEstate());
@@ -910,7 +1054,7 @@ namespace Gad
                         if (rng.Chance(0.55f)) Npc(p + new Vector3(0, 0, -0.75f), 0, b.id * 13 + (int)(x * 7 + z * 3) + floor * 101, 2, 3);
                     }
                 Plant(new Vector3(-w / 2 + 1, 0, d - 1)); Plant(new Vector3(w / 2 - 1, 0, d - 1));
-                string title = b.type == BType.Agency ? "АГЕНТСТВО «ГАД СИТИ» · ЭТАЖ " + (floor + 1) : b.name + " · ЭТАЖ " + (floor + 1);
+                string title = b.type == BType.Agency ? "АГЕНТСТВО «GOD CITY» · ЭТАЖ " + (floor + 1) : b.name + " · ЭТАЖ " + (floor + 1);
                 Sign(new Vector3(0, 2.8f, d - 0.1f), title, b.Info.Sign, 4);
                 Point(new Vector3(3.5f, 0, 3.5f), b.type == BType.Agency ? "АГЕНТ: КУПИТЬ ЖИЛЬЁ" : "РЕСЕПШН: РАБОТА И БИЗНЕС", () => { if (b.type == BType.Agency) Menus.RealEstate(); else Menus.Building(b); });
             }

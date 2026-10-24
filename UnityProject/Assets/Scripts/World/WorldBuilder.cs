@@ -95,6 +95,34 @@ namespace Gad
             m.Box(Curbside, Sidewalk, new Vector3(X0 + City.Road, -0.05f, Z0 + City.Road), new Vector3(X1 - City.Road, City.Curb, Z1 - City.Road), new Vector2(4, 4));
             m.Flat(Inner(City.Districts[bx, bz]), X0 + City.Walk, Z0 + City.Walk, X1 - City.Walk, Z1 - City.Walk, City.Curb + 0.004f, City.Districts[bx, bz] == District.Downtown ? 4f : 8f);
 
+            // granite kerb stones round the block and a darker gutter in the road next to them
+            curb ??= Photo.Mat("granite_tile", new Color(0.82f, 0.82f, 0.8f), 0.2f);
+            gutter ??= Photo.Mat("asphalt_02", new Color(0.55f, 0.55f, 0.57f), 0.3f);
+            patch ??= Photo.Mat("asphalt_02", new Color(0.62f, 0.62f, 0.65f), 0.25f);
+            manhole ??= Photo.Mat("metal_plate", new Color(0.45f, 0.45f, 0.45f), 0.4f);
+            float r0 = City.Road, r1 = City.Road + 0.3f;
+            m.Box(curb, curb, new Vector3(X0 + r0, -0.05f, Z0 + r0), new Vector3(X1 - r0, City.Curb + 0.02f, Z0 + r1), new Vector2(1, 1));
+            m.Box(curb, curb, new Vector3(X0 + r0, -0.05f, Z1 - r1), new Vector3(X1 - r0, City.Curb + 0.02f, Z1 - r0), new Vector2(1, 1));
+            m.Box(curb, curb, new Vector3(X0 + r0, -0.05f, Z0 + r0), new Vector3(X0 + r1, City.Curb + 0.02f, Z1 - r0), new Vector2(1, 1));
+            m.Box(curb, curb, new Vector3(X1 - r1, -0.05f, Z0 + r0), new Vector3(X1 - r0, City.Curb + 0.02f, Z1 - r0), new Vector2(1, 1));
+            m.Flat(gutter, X0 + r0 - 0.45f, Z0 + r0 - 0.45f, X1 - r0 + 0.45f, Z0 + r0, 0.004f, 8f);
+            m.Flat(gutter, X0 + r0 - 0.45f, Z1 - r0, X1 - r0 + 0.45f, Z1 - r0 + 0.45f, 0.004f, 8f);
+            m.Flat(gutter, X0 + r0 - 0.45f, Z0 + r0, X0 + r0, Z1 - r0, 0.004f, 8f);
+            m.Flat(gutter, X1 - r0, Z0 + r0, X1 - r0 + 0.45f, Z1 - r0, 0.004f, 8f);
+            var prng = new Rng(H.U(bx, bz, 61));
+            for (int k = 0; k < 3; k++)
+            {
+                // asphalt patches and manholes in the lanes on this block's west and south roads
+                float s = prng.F(X0 + 14, X1 - 14);
+                m.Flat(patch, s, Z0 - prng.F(1, 5), s + prng.F(1.5f, 4f), Z0 - prng.F(0.2f, 0.8f), 0.006f, 8f);
+                float sz = prng.F(Z0 + 14, Z1 - 14);
+                m.Box(manhole, manhole, new Vector3(X0 + 2.4f, 0, sz), new Vector3(X0 + 3.1f, 0.02f, sz + 0.7f), new Vector2(0.7f, 0.7f));
+                // storm drain grates by the kerb
+                float gz = Z0 + 12 + k * 22;
+                m.Box(manhole, manhole, new Vector3(X0 + r0 - 0.42f, 0, gz), new Vector3(X0 + r0 - 0.02f, 0.015f, gz + 0.8f), new Vector2(0.4f, 0.4f));
+                float gx = X0 + 12 + k * 22;
+                m.Box(manhole, manhole, new Vector3(gx, 0, Z0 + r0 - 0.42f), new Vector3(gx + 0.8f, 0.015f, Z0 + r0 - 0.02f), new Vector2(0.4f, 0.4f));
+            }
             // markings: left (x = X0) and bottom (z = Z0) roads of this block, plus the outer ones on the edges
             Lanes(m, X0, Z0, Z1, true);
             Lanes(m, Z0, X0, X1, false);
@@ -103,9 +131,17 @@ namespace Gad
         }
 
         /// <summary>Centre dashes and zebra crossings of one road segment between two crossroads.</summary>
+        static Material curb, gutter, patch, manhole;
+
         static void Lanes(MeshB m, float line, float a0, float a1, bool alongZ)
         {
             const float y = 0.012f;
+            // solid edge lines next to the gutters
+            foreach (float e in new[] { -City.Road + 0.75f, City.Road - 0.75f })
+            {
+                if (alongZ) m.Flat(Paint, line + e - 0.06f, a0 + City.Road, line + e + 0.06f, a1 - City.Road, y, 1f);
+                else m.Flat(Paint, a0 + City.Road, line + e - 0.06f, a1 - City.Road, line + e + 0.06f, y, 1f);
+            }
             float s0 = a0 + City.Road + 5f, s1 = a1 - City.Road - 5f;
             for (float s = s0; s < s1; s += 6f)
             {

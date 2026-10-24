@@ -445,6 +445,40 @@ namespace Gad
             return b;
         }
 
+        /// <summary>Clothes as pictures: a grid of cards, each showing the item worn on the body.</summary>
+        public void ItemGrid(List<(string id, string label, bool sel, Action act, SkinSet with)> cells, Wardrobe.Slot slot, SkinSet look)
+        {
+            var host = UIKit.Rect("ItemGrid", Content);
+            var grid = host.gameObject.AddComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(176, 214);
+            grid.spacing = new Vector2(10, 10);
+            grid.padding = new RectOffset(6, 6, 6, 6);
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 5;
+            var studio = Studio.Get();
+            foreach (var c in cells)
+            {
+                var card = UIKit.Img(host, UIKit.Glass, Color.white, "Card", true);
+                if (c.sel)
+                {
+                    var ring = UIKit.Img(card.transform, UIKit.Btn, UIKit.Gold, "Sel");
+                    UIKit.Fill(ring.rectTransform, -4, -4, -4, -4);
+                    ring.transform.SetAsFirstSibling();
+                }
+                var pic = UIKit.Rect("Pic", card.transform).gameObject.AddComponent<RawImage>();
+                UIKit.Place(pic.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -8), new Vector2(160, 160));
+                pic.color = new Color(1, 1, 1, 0.15f);
+                string key = c.id + "|" + c.with.hGender + "|" + c.with.hSkin + (slot == Wardrobe.Slot.HHair || slot == Wardrobe.Slot.HAcc ? "" : "|" + c.with.hHair);
+                var ready = studio.Icon(key, c.with, slot, tex => { if (pic != null) { pic.texture = tex; pic.color = Color.white; } });
+                if (ready != null) { pic.texture = ready; pic.color = Color.white; }
+                var lbl = UIKit.Txt(card.transform, c.label, 18, c.sel ? UIKit.Gold : Color.white, TMPro.TextAlignmentOptions.Center, false);
+                UIKit.Place(lbl.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 4), new Vector2(170, 44));
+                lbl.enableAutoSizing = true; lbl.fontSizeMin = 12; lbl.fontSizeMax = 18;
+                var btn = card.gameObject.AddComponent<UIButton>();
+                btn.Bg = card; btn.OnClick = c.act;
+            }
+        }
+
         /// <summary>A row of small buttons (colour pickers, options).</summary>
         public void Chips(string title, IList<(string label, Color color, bool selected, Action act)> chips)
         {

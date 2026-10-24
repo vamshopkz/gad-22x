@@ -136,6 +136,7 @@ namespace Gad
                 hTop = Pick(tops) ?? "ht_tee_white",
                 hBottom = Pick(bottoms) ?? "hb_jeans_blue",
                 hShoes = Pick(shoes) ?? "hf_sneakers_white",
+                hFace = new[] { "hface_oval", "hface_round", "hface_square", "hface_long", "hface_heart", "hface_chubby" }[r.I(6)],
                 hAcc = r.Chance(0.2f) ? (r.Chance(0.5f) ? "ha_sunglasses" : "ha_glasses") : "ha_none",
             };
             if (Wardrobe.Find(s.hTop)?.style == "dress") s.hBottom = "hb_none";

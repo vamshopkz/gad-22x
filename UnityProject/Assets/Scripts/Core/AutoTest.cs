@@ -89,7 +89,8 @@ namespace Gad
                 pl.Yaw = 0; pl.Pitch = 18;
                 yield return Wait(0.3f);
                 bool ok = pl.Inside == b.id && Interiors.Points.Count >= 1;
-                if (n < 12 || t == BType.Villa || t == BType.Tower || t == BType.Airport) yield return Shot($"10_in_{n:00}_{t}");
+                if (n < 12 || t == BType.Villa || t == BType.Tower || t == BType.Airport || t == BType.Clothes) yield return Shot($"10_in_{n:00}_{t}");
+                if (t == BType.Clothes) { pl.Yaw = 30; pl.Pitch = 8; yield return Wait(0.3f); yield return Shot("11_clothes_racks"); pl.Yaw = 140; yield return Wait(0.3f); yield return Shot("11_clothes_fitting"); }
                 Check("вход: " + BInfo.All[t].Title, ok && near == b, Interiors.Points.Count + " действий");
                 Interiors.Exit();
                 yield return null;
@@ -396,7 +397,7 @@ namespace Gad
             yield return Wait(0.5f);
             Menus.Phone(); yield return Wait(0.4f); yield return Shot("60_phone"); Window.Close();
             Menus.Map(); yield return Wait(0.4f); yield return Shot("61_map"); Window.Close();
-            Menus.Dress(false, true); yield return Wait(0.4f); yield return Shot("62_create"); Window.Close();
+            Menus.Dress(false, true); yield return Wait(5f); yield return Shot("62_create"); Window.Close();
             Menus.CarDealer(dealer); yield return Wait(0.4f); yield return Shot("63_dealer"); Window.Close();
             Menus.Skins(); yield return Wait(0.4f); yield return Shot("64_skins"); Window.Close();
             int bad = 0;
@@ -404,6 +405,19 @@ namespace Gad
                 foreach (var id in new[] { p.look.hHair, p.look.hTop, p.look.hBottom, p.look.hShoes, p.look.hAcc, p.look.hSkin, p.look.hEyes, p.look.hMouth })
                     if (Wardrobe.Find(id) == null) { bad++; Debug.Log("[AutoTest] missing skin item " + id + " in " + p.name); }
             Check("все предметы скинов существуют", bad == 0, bad + " отсутствует");
+            // face shapes close up
+            {
+                int fi = 0;
+                foreach (var fid in new[] { "hface_oval", "hface_square", "hface_heart" })
+                {
+                    var look = new SkinSet { hFace = fid };
+                    pl.Body.Rebuild(look);
+                    pl.Yaw = 180; pl.Pitch = 0; pl.Dist = 1.1f;
+                    yield return Wait(0.5f);
+                    yield return Shot($"65_face_{fi++}_{fid}");
+                }
+                Check("формы лица в каталоге", Wardrobe.OfSlot(Wardrobe.Slot.HFace).Count >= 5, Wardrobe.OfSlot(Wardrobe.Slot.HFace).Count + " форм");
+            }
             Save.D.skin = Menus.SkinPresets[4].look.Clone();
             pl.Body.Rebuild(Save.D.skin);
             pl.Yaw = 180; pl.Pitch = 6; pl.Dist = 3.2f;

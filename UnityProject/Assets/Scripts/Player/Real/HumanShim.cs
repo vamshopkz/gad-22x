@@ -10,10 +10,10 @@ namespace Gad
     {
         public string character = "human", hand = "hand_none";
         public string hGender = "hg_m", hSkin = "hs_light", hHair = "hh_short_brown", hEyes = "he_brown", hMouth = "hm_smile",
-                      hTop = "ht_tee_white", hBottom = "hb_jeans_blue", hShoes = "hf_sneakers_white", hAcc = "ha_none",
+                      hFace = "hface_oval", hTop = "ht_tee_white", hBottom = "hb_jeans_blue", hShoes = "hf_sneakers_white", hAcc = "ha_none",
                       hHat = "head_none", hNeck = "neck_none", hBack = "back_none", hNumber = "hn_none";
 
-        public string Encode() => string.Join(";", hGender, hSkin, hHair, hEyes, hMouth, hTop, hBottom, hShoes, hAcc);
+        public string Encode() => string.Join(";", hGender, hSkin, hHair, hEyes, hMouth, hTop, hBottom, hShoes, hAcc, hFace);
 
         public static SkinSet Decode(string s)
         {
@@ -21,6 +21,7 @@ namespace Gad
             if (string.IsNullOrEmpty(s)) return k;
             var q = s.Split(';');
             if (q.Length >= 9) { k.hGender = q[0]; k.hSkin = q[1]; k.hHair = q[2]; k.hEyes = q[3]; k.hMouth = q[4]; k.hTop = q[5]; k.hBottom = q[6]; k.hShoes = q[7]; k.hAcc = q[8]; }
+            if (q.Length >= 10) k.hFace = q[9];
             return k;
         }
 
@@ -28,7 +29,7 @@ namespace Gad
         {
             Wardrobe.Slot.HGender => hGender, Wardrobe.Slot.HSkin => hSkin, Wardrobe.Slot.HHair => hHair, Wardrobe.Slot.HEyes => hEyes,
             Wardrobe.Slot.HMouth => hMouth, Wardrobe.Slot.HTop => hTop, Wardrobe.Slot.HBottom => hBottom, Wardrobe.Slot.HShoes => hShoes,
-            Wardrobe.Slot.HAcc => hAcc, _ => null,
+            Wardrobe.Slot.HAcc => hAcc, Wardrobe.Slot.HFace => hFace, _ => null,
         };
 
         public void Set(Wardrobe.Slot slot, string id)
@@ -44,6 +45,7 @@ namespace Gad
                 case Wardrobe.Slot.HBottom: hBottom = id; break;
                 case Wardrobe.Slot.HShoes: hShoes = id; break;
                 case Wardrobe.Slot.HAcc: hAcc = id; break;
+                case Wardrobe.Slot.HFace: hFace = id; break;
             }
         }
 
@@ -54,7 +56,7 @@ namespace Gad
 
     public static partial class Wardrobe
     {
-        public enum Slot { Character, Head, Eyes, Mouth, Neck, Shirt, Shorts, Back, Kit, Number, Hand, Legs, Costume, HGender, HSkin, HHair, HEyes, HMouth, HTop, HBottom, HShoes, HAcc, HHat, HNeck, HBack, HNumber }
+        public enum Slot { Character, Head, Eyes, Mouth, Neck, Shirt, Shorts, Back, Kit, Number, Hand, Legs, Costume, HGender, HSkin, HHair, HEyes, HMouth, HTop, HBottom, HShoes, HAcc, HHat, HNeck, HBack, HNumber, HFace }
 
         public class SkinDef
         {

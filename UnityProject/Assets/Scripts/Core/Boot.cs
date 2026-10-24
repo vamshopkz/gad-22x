@@ -56,7 +56,7 @@ namespace Gad
 
             if (Has("-autotest")) gameObject.AddComponent<AutoTest>();
             else if (Has("-mptest")) gameObject.AddComponent<AutoTest>().Multiplayer = true;
-            else if (!Save.D.created) Menus.Dress(false, true);
+            else if (!Save.D.created || string.IsNullOrEmpty(Save.D.name) || Save.D.name.Length < 3) Menus.Nick();
             else Hud.Toast("С возвращением, " + Save.D.name + "!", UIKit.Cyan);
         }
 

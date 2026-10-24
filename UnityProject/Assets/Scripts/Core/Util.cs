@@ -289,6 +289,7 @@ namespace Gad
             mesh.subMeshCount = mats.Count;
             for (int i = 0; i < tris.Count; i++) mesh.SetTriangles(tris[i], i, false);
             mesh.RecalculateBounds();
+            mesh.RecalculateTangents();
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = go.AddComponent<MeshRenderer>();
             r.sharedMaterials = mats.ToArray();

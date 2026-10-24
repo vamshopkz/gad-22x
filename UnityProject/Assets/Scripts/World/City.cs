@@ -300,7 +300,7 @@ namespace Gad
         {
             var info = b.Info;
             if (b.type == BType.House) b.name = "Дом " + (b.id % 97 + 1);
-            else if (b.type == BType.Agency) b.name = "ГАД Сити · Недвижимость";
+            else if (b.type == BType.Agency) b.name = "GOD City · Недвижимость";
             else b.name = H.Pick(info.Names, b.id, 77);
             if (b.cx >= 0)
             {

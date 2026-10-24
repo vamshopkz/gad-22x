@@ -34,7 +34,7 @@ namespace Gad
     /// </summary>
     public static class CarMesh
     {
-        public const int Paint = 0, GlassS = 1, Chrome = 2, Gloss = 3, Matte = 4, HeadL = 5, TailL = 6, Interior = 7, Screen = 8, Plate = 9, Rubber = 10, RimS = 11, Brake = 12, Slots = 13;
+        public const int Paint = 0, GlassS = 1, Chrome = 2, Gloss = 3, Matte = 4, HeadL = 5, TailL = 6, Interior = 7, Screen = 8, Plate = 9, Rubber = 10, RimS = 11, Brake = 12, PlateT = 13, Slots = 14;
 
         public class Built
         {
@@ -74,6 +74,7 @@ namespace Gad
                 baseMats[Screen] = Mats.Glow(new Color(0.2f, 0.45f, 0.85f));
                 baseMats[Plate] = Mats.Lit(new Color(0.93f, 0.93f, 0.9f), null, 0.4f, 0f);
                 baseMats[Rubber] = Mats.Lit(new Color(0.045f, 0.045f, 0.05f), null, 0.18f, 0f);
+                baseMats[PlateT] = Mats.Lit(Color.white, Resources.Load<Texture2D>("Cars/plates"), 0.45f, 0f);
                 baseMats[RimS] = Mats.Lit(new Color(0.62f, 0.64f, 0.67f), null, 0.8f, 0.95f);
             }
             var arr = (Material[])baseMats.Clone();
@@ -146,6 +147,18 @@ namespace Gad
                 }
             }
             public readonly List<Vector3> nr = new List<Vector3>();
+
+            /// <summary>A flat quad facing `n` with the uv rectangle `r` (number plates).</summary>
+            public void Decal(int s, Vector3 c, Vector3 n, float w, float h, Rect r)
+            {
+                var right = Vector3.Cross(Vector3.up, n).normalized * (w / 2);
+                var up = Vector3.up * (h / 2);
+                int i = v.Count;
+                v.Add(c + right - up); v.Add(c + right + up); v.Add(c - right + up); v.Add(c - right - up);
+                uv.Add(new Vector2(r.xMin, r.yMin)); uv.Add(new Vector2(r.xMin, r.yMax)); uv.Add(new Vector2(r.xMax, r.yMax)); uv.Add(new Vector2(r.xMax, r.yMin));
+                t[s].Add(i); t[s].Add(i + 1); t[s].Add(i + 3);
+                t[s].Add(i + 1); t[s].Add(i + 2); t[s].Add(i + 3);
+            }
 
             public void Box(int s, Vector3 c, Vector3 size, Quaternion? rot = null) =>
                 Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(c, rot ?? Quaternion.identity, size), s);
@@ -287,6 +300,8 @@ namespace Gad
             string ck = def.Id + "_" + lod;
             if (cache.TryGetValue(ck, out var b)) return b;
             var s = def.Spec;
+            plateCell = (def.Id.GetHashCode() & 0x7fffffff) % 16;
+            if (def.Id.Contains("g30") || def.Id.Contains("bmw")) plateCell = 2;
             b = new Built { spec = s };
             var body = new SM();
             var door = new SM();
@@ -453,6 +468,9 @@ namespace Gad
             return front ? hl - 0.3f : -hl + 0.3f;
         }
 
+        static int plateCell;
+        static Rect PlateUV => new Rect((plateCell % 4) * 0.25f + 0.002f, 1f - (plateCell / 4 + 1) * 0.25f + 0.004f, 0.246f, 0.242f);
+
         static void Details(SM body, SM door, Prof p, Matrix4x4 doorXf, float dz0, float dz1)
         {
             var s = p.s;
@@ -497,6 +515,7 @@ namespace Gad
             float iz = FrontAt(p, 0, iy, true);
             body.Box(Matte, new Vector3(0, iy, iz - 0.01f), new Vector3(s.W * 0.5f, 0.12f, 0.06f));
             body.Box(Plate, new Vector3(0, iy + 0.1f, FrontAt(p, 0, iy + 0.1f, true) + 0.005f), new Vector3(0.52f, 0.11f, 0.012f));
+            body.Decal(PlateT, new Vector3(0, iy + 0.1f, FrontAt(p, 0, iy + 0.1f, true) + 0.0115f), Vector3.forward, 0.52f, 0.11f, PlateUV);
             foreach (float sx in new[] { -1f, 1f })
                 body.Box(Matte, new Vector3(sx * s.W * 0.36f, iy + 0.02f, FrontAt(p, sx * s.W * 0.36f, iy + 0.02f, true) - 0.005f), new Vector3(0.2f, 0.1f, 0.05f));
 
@@ -562,6 +581,18 @@ namespace Gad
             if (s.Tail == 1) body.Box(TailL, new Vector3(0, ty + 0.02f, FrontAt(p, 0, ty + 0.02f, false) - 0.01f), new Vector3(s.W * 0.8f, 0.018f, 0.02f));
             float py = s.TailBottom + 0.25f;
             body.Box(Plate, new Vector3(0, py, FrontAt(p, 0, py, false) - 0.006f), new Vector3(0.52f, 0.11f, 0.012f));
+            body.Decal(PlateT, new Vector3(0, py, FrontAt(p, 0, py, false) - 0.0125f), Vector3.back, 0.52f, 0.11f, PlateUV);
+            // shark-fin aerial and a third brake light at the back of the roof
+            float finZ = Mathf.Lerp(s.ZC, s.ZB, 0.15f);
+            body.Box(Gloss, new Vector3(0, RoofLine(p, finZ) + 0.03f, finZ), new Vector3(0.06f, 0.06f, 0.16f), Quaternion.Euler(-12, 0, 0));
+            body.Box(TailL, new Vector3(0, RoofLine(p, s.ZC) - 0.03f, s.ZC - 0.02f), new Vector3(0.28f, 0.018f, 0.02f));
+            // windscreen wipers resting at the base of the windshield
+            foreach (float wx in new[] { -0.32f, 0.18f })
+            {
+                float wz = s.ZA - 0.03f, wy = p.Belt(wz) + 0.025f;
+                body.Box(Matte, new Vector3(wx, wy, wz), new Vector3(0.55f, 0.012f, 0.025f), Quaternion.Euler(0, 6, 0));
+                body.Cyl(Matte, new Vector3(wx + 0.26f, wy - 0.005f, wz + 0.01f), new Vector3(0.03f, 0.012f, 0.03f), Quaternion.identity);
+            }
             if (s.Badge) body.Cyl(Chrome, new Vector3(0, ty + 0.12f, FrontAt(p, 0, ty + 0.12f, false) - 0.005f), new Vector3(0.07f, 0.005f, 0.07f), Quaternion.Euler(90, 0, 0));
             float dy = s.TailBottom + 0.08f;
             body.Box(Matte, new Vector3(0, dy, FrontAt(p, 0, dy, false) + 0.02f), new Vector3(s.W * 0.7f, 0.1f, 0.08f));
@@ -732,6 +763,25 @@ namespace Gad
             }
             m.Cyl(RimS, new Vector3(w * 0.3f + 0.01f, 0, 0), new Vector3(rimR * 0.42f, 0.02f, rimR * 0.42f), Quaternion.Euler(0, 0, 90));
             m.Cyl(Chrome, new Vector3(w * 0.3f + 0.025f, 0, 0), new Vector3(rimR * 0.18f, 0.01f, rimR * 0.18f), Quaternion.Euler(0, 0, 90));
+            // lug nuts round the hub
+            for (int k = 0; k < 5; k++)
+            {
+                float a = k / 5f * Mathf.PI * 2;
+                m.Cyl(Chrome, new Vector3(w * 0.3f + 0.028f, Mathf.Cos(a) * rimR * 0.13f, Mathf.Sin(a) * rimR * 0.13f), new Vector3(0.022f, 0.012f, 0.022f), Quaternion.Euler(0, 0, 90));
+            }
+            if (lod == 0)
+            {   // tread: blocks across the tyre with grooves between them, and a raised sidewall ring
+                int blocks = 44;
+                for (int k = 0; k < blocks; k++)
+                {
+                    var rot = Quaternion.Euler(k / (float)blocks * 360f, 0, 0);
+                    foreach (float bx in new[] { -0.075f, 0f, 0.075f })
+                        m.Box(Rubber, rot * new Vector3(bx, R - 0.003f, 0), new Vector3(0.062f, 0.012f, R * 6.2832f / blocks * 0.72f), rot * Quaternion.Euler(0, (bx == 0 ? 0 : 18 * Mathf.Sign(bx)), 0));
+                }
+                var side = new List<Vector3>();
+                for (int k = 0; k < 40; k++) { float a = k / 40f * Mathf.PI * 2; side.Add(new Vector3(w / 2 - 0.004f, Mathf.Cos(a) * (R - 0.06f), Mathf.Sin(a) * (R - 0.06f))); }
+                m.Add(Human.Tube(null, side, 0.006f, 5, true), Matrix4x4.identity, Rubber);
+            }
             return m.Build("wheel_" + s.R + "_" + lod, true);
         }
     }

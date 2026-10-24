@@ -42,6 +42,7 @@ namespace Gad
             public float shoulder = 1f, chest = 1f, waist = 1f, hip = 1f, limb = 1f, headSize = 1f, bust;
             public Profile pelvis, torso, neck, head, uArm, fArm, hand, thigh, shin, foot;
             public float headTop, eyeY = 0.105f;
+            public int face;
         }
 
         // =====================================================================
@@ -204,9 +205,15 @@ namespace Gad
         // The body
         // =====================================================================
 
-        public static Shape MakeShape(bool female)
+        /// <summary>Face shapes: (jaw width, cheekbone width, chin-to-eyes length, chin flatness).</summary>
+        static readonly (float jaw, float cheek, float len, float chin)[] Faces =
         {
-            var s = new Shape { female = female };
+            (1f, 1f, 1f, 1f), (1.16f, 1.1f, 0.88f, 1.3f), (1.28f, 1.03f, 1f, 1.8f), (0.88f, 0.92f, 1.2f, 0.9f), (0.78f, 1.16f, 1.04f, 0.65f), (1.18f, 1.22f, 0.95f, 1.2f),
+        };
+
+        public static Shape MakeShape(bool female, int face = 0)
+        {
+            var s = new Shape { female = female, face = Mathf.Clamp(face, 0, Faces.Length - 1) };
             if (female) { s.shoulder = 0.87f; s.chest = 0.93f; s.waist = 0.84f; s.hip = 1.1f; s.limb = 0.9f; s.headSize = 0.96f; s.bust = 1f; }
             float sh = s.shoulder, ch = s.chest, wa = s.waist, hp = s.hip, lm = s.limb;
             // Pelvis (hips bone at 0.98 m): from the crotch up to the waist.
@@ -244,6 +251,20 @@ namespace Gad
                 new Key(0.224f * hs, 0.047f * hs, 0.057f * hs, -0.009f * hs),
                 new Key(0.233f * hs, 0.028f * hs, 0.034f * hs, -0.008f * hs),
                 new Key(0.237f * hs, 0.006f * hs, 0.007f * hs, -0.008f * hs));
+            var fs = Faces[s.face];
+            if (s.face != 0)
+            {
+                float ey0 = 0.105f * hs;
+                for (int i = 0; i < s.head.keys.Length; i++)
+                {
+                    var k = s.head.keys[i];
+                    float y = k.y;
+                    float w = y < ey0 ? Mathf.Lerp(fs.jaw, fs.cheek, Mathf.InverseLerp(-0.02f * hs, 0.08f * hs, y)) : Mathf.Lerp(fs.cheek, 1f, Mathf.InverseLerp(0.12f * hs, 0.2f * hs, y));
+                    if (i == 0) { w = fs.chin * Mathf.Lerp(1f, fs.jaw, 0.5f); }
+                    if (y < ey0) y = ey0 - (ey0 - y) * fs.len;
+                    s.head.keys[i] = new Key(y, k.rx * w, k.rz * Mathf.Lerp(1f, w, 0.35f), k.cz);
+                }
+            }
             s.headTop = 0.235f * hs;
             s.eyeY = 0.105f * hs;
             // Arms hang along −Y from the shoulder; hands are flat (thin in X, wide in Z).
@@ -259,6 +280,7 @@ namespace Gad
         }
 
         static string ShapeKey(Shape s) => s.female ? "f" : "m";
+        static string HeadKey(Shape s) => ShapeKey(s) + s.face;
 
         // ---------------- anatomy: small bumps and hollows on the smooth parts ----------------
 
@@ -327,10 +349,69 @@ namespace Gad
         public static Material SkinMat(Color c, bool mannequin) =>
             Mats.Shared("human_skin_" + ColorUtility.ToHtmlStringRGB(c) + (mannequin ? "m" : ""), () => Mats.Lit(c, null, mannequin ? 0.42f : 0.28f));
 
-        /// <summary>A bare body with all its bones (no face, hair or clothes yet).</summary>
-        public static HumanRig BuildBody(Transform holder, bool female, Color skin, bool mannequin, float height)
+        static readonly Texture2D[] faceAlb = new Texture2D[2];
+        static Texture2D faceNrm;
+
+        /// <summary>
+        /// Skin of the face: a white-based tint (multiplied by the skin tone) with blush on the cheeks,
+        /// soft shadows round the eyes, a warmer nose and lips area, stubble on men, and fine pores.
+        /// Laid out like the head loft: u = angle round the head (front = 0.25), v = height.
+        /// </summary>
+        public static Material FaceMat(Color skin, bool female)
         {
-            var s = MakeShape(female);
+            return Mats.Shared("human_face_" + ColorUtility.ToHtmlStringRGB(skin) + (female ? "f" : "m"), () =>
+            {
+                int fi = female ? 1 : 0;
+                const int S = 256;
+                if (faceAlb[fi] == null)
+                {
+                    var px = new Color[S * S];
+                    float ey = 0.105f;
+                    for (int yy = 0; yy < S; yy++)
+                        for (int xx = 0; xx < S; xx++)
+                        {
+                            float a = (xx + 0.5f) / S * 360f, y = Mathf.Lerp(-0.03f, 0.237f, (yy + 0.5f) / S);
+                            float blush = G(a, 52f, 13f, y, ey - 0.032f, 0.018f, 1f) + G(a, 128f, 13f, y, ey - 0.032f, 0.018f, 1f);
+                            float socket = G(a, 68f, 9f, y, ey + 0.004f, 0.012f, 1f) + G(a, 112f, 9f, y, ey + 0.004f, 0.012f, 1f);
+                            float nose = G(a, 90f, 7f, y, ey - 0.03f, 0.014f, 1f);
+                            float lips = G(a, 90f, 14f, y, 0.022f, 0.008f, 1f);
+                            float n = Mathf.PerlinNoise(xx * 0.35f, yy * 0.35f) - 0.5f;
+                            var c = Color.white * (1f + n * 0.025f);
+                            c = Color.Lerp(c, new Color(1f, 0.78f, 0.76f), blush * (female ? 0.55f : 0.35f));
+                            c = Color.Lerp(c, new Color(0.84f, 0.74f, 0.76f), socket * (female ? 0.55f : 0.45f));
+                            c = Color.Lerp(c, new Color(1f, 0.86f, 0.84f), nose * 0.35f);
+                            c = Color.Lerp(c, new Color(0.95f, 0.72f, 0.72f), lips * 0.5f);
+                            if (!female)
+                            {   // stubble: speckles on the jaw, chin and upper lip
+                                float jaw = Mathf.Clamp01(1f - Mathf.Abs(Mathf.DeltaAngle(a, 90f)) / 70f) * Mathf.Clamp01((ey - 0.04f - y) / 0.02f) * Mathf.Clamp01((y + 0.025f) / 0.02f);
+                                float cheekGap = blush * 1.2f;
+                                float speck = Mathf.PerlinNoise(xx * 1.7f, yy * 1.7f) > 0.48f ? 1f : 0.45f;
+                                c = Color.Lerp(c, new Color(0.78f, 0.74f, 0.74f), Mathf.Clamp01(jaw - cheekGap) * 0.35f * (0.7f + 0.3f * speck));
+                            }
+                            c.a = 1f;
+                            px[yy * S + xx] = c;
+                        }
+                    var tex = new Texture2D(S, S, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, name = "face_" + fi };
+                    tex.SetPixels(px);
+                    tex.Apply(true);
+                    faceAlb[fi] = tex;
+                }
+                if (faceNrm == null)
+                {
+                    var h = new float[S * S];
+                    for (int yy = 0; yy < S; yy++)
+                        for (int xx = 0; xx < S; xx++)
+                            h[yy * S + xx] = ProcTex.PeriodicNoise(xx, yy, S, 128, 3.1f) * 0.5f + ProcTex.PeriodicNoise(xx, yy, S, 32, 7.7f) * 0.5f;
+                    faceNrm = ProcTex.NormalFromHeight(h, S, 1.2f, "face_pores");
+                }
+                return Mats.LitNormal(skin, faceAlb[fi], faceNrm, 0.12f, 0.3f);
+            });
+        }
+
+        /// <summary>A bare body with all its bones (no face, hair or clothes yet).</summary>
+        public static HumanRig BuildBody(Transform holder, bool female, Color skin, bool mannequin, float height, int face = 0)
+        {
+            var s = MakeShape(female, face);
             string sk = ShapeKey(s);
             var mat = SkinMat(skin, mannequin);
             var rig = Bone("HumanRig", holder, Vector3.zero);
@@ -349,7 +430,7 @@ namespace Gad
             h.neck = Bone("neck", h.torso, Bones.NeckFromTorso);
             Part("body_neck", Loft("neck2_" + sk, s.neck, s.neck.Y0, s.neck.Y1, 0f, true, true, 10, 32, bump: (a, y) => G(a, 70f, 10f, y, 0.04f, 0.04f, 0.0025f) + G(a, 110f, 10f, y, 0.04f, 0.04f, 0.0025f) + (s.female ? 0f : G(a, 90f, 8f, y, 0.05f, 0.012f, 0.004f))), mat, h.neck);
             h.head = Bone("head", h.neck, Bones.HeadFromNeck);
-            BuildHead(h, mat);
+            BuildHead(h, mannequin ? mat : FaceMat(skin, female));
 
             foreach (var side in new[] { -1f, 1f })
             {
@@ -414,7 +495,7 @@ namespace Gad
         {
             var s = h.shape;
             string sk = ShapeKey(s);
-            Part("body_head", Loft("head2_" + sk, s.head, s.head.Y0, s.head.Y1, 0f, true, true, 44, 64, bump: HeadBump(s)), mat, h.head);
+            Part("body_head", Loft("head2_" + HeadKey(s), s.head, s.head.Y0, s.head.Y1, 0f, true, true, 44, 64, bump: HeadBump(s)), mat, h.head);
             float hs = s.headSize;
             // Nose: a soft wedge on the middle of the face.
             float ny = s.eyeY - 0.03f * hs;

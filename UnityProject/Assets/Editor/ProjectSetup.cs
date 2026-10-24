@@ -237,6 +237,8 @@ public static class ProjectSetup
         m.SetColor("_EmissionColor", Color.black);
         m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
         Save(m, "LitNormalEmissive");
+        var fis = Shader.Find("Gad/FacadeInterior");
+        if (fis != null) Save(new Material(fis), "FacadeInterior"); else Debug.LogError("[Setup] FacadeInterior shader missing");
         var pano = Shader.Find("Skybox/Panoramic");
         if (pano != null) Save(new Material(pano), "SkyPano");
 
@@ -290,7 +292,7 @@ public static class ProjectSetup
     static void SetupPlayer()
     {
         PlayerSettings.companyName = "Aleksandr Kuzmenko";
-        PlayerSettings.productName = "GAD 2-2 X";
+        PlayerSettings.productName = "GOD 2-2X";
         PlayerSettings.colorSpace = ColorSpace.Linear;
         PlayerSettings.runInBackground = true;
         PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.aleksandrkuzmenko.gad22x");

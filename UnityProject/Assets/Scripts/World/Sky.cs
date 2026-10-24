@@ -117,6 +117,7 @@ namespace Gad
             }
 
             PostFx.Tick(NightK, inside);
+            Shader.SetGlobalFloat("_GadNight", NightK);
             // windows and lamps
             float win = Mathf.SmoothStep(0, 1, NightK) * 0.85f + wx * 0.15f;
             foreach (var m in WorldBuilder.NightMats) m.SetColor("_EmissionColor", Color.white * win);

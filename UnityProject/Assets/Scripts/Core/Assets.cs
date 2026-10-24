@@ -35,6 +35,26 @@ namespace Gad
         {
             string key = "facade" + style;
             if (mats.TryGetValue(key, out var m) && m != null) return m;
+            var fi = Resources.Load<Material>("Materials/FacadeInterior");
+            if (fi != null && fi.shader != null && fi.shader.isSupported)
+            {
+                string q = "Facades/f" + style;
+                var aa = Resources.Load<Texture2D>(q + "_a");
+                if (aa != null)
+                {
+                    m = new Material(fi) { name = "FacadeInterior " + style };
+                    m.SetTexture("_BaseMap", aa);
+                    m.SetTexture("_BumpMap", Resources.Load<Texture2D>(q + "_n"));
+                    m.SetTexture("_MaskMap", Resources.Load<Texture2D>(q + "_m"));
+                    m.SetTexture("_Rooms", Resources.Load<Texture2D>("Facades/rooms"));
+                    m.SetFloat("_BumpScale", 1f);
+                    m.SetFloat("_LitRate", style == 5 ? 0.25f : style == 4 ? 0.9f : 0.45f);
+                    m.SetFloat("_RoomDepth", style == 4 ? 0.9f : style == 0 || style == 7 ? 1.4f : 1.1f);
+                    m.SetFloat("_DayRoom", style == 0 || style == 7 ? 0.12f : style == 4 ? 0.6f : 0.38f);
+                    mats[key] = m;
+                    return m;
+                }
+            }
             if (facadeBase == null) facadeBase = Resources.Load<Material>("Materials/LitNormalEmissive");
             string p = "Facades/f" + style;
             var a = Resources.Load<Texture2D>(p + "_a");

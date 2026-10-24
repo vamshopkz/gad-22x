@@ -152,7 +152,7 @@ def facade(name, wall_tex, wall_m, kind, win, frame, glass_tint, seed, rows_h=No
     alb = alb * ao[..., None]
     hn = normal_from_height(gauss(np.dstack([height] * 3), 1.2)[..., 0], 14.0)
     nrm = blend_normals(hn, nrm)
-    mask = np.dstack([metal, np.zeros_like(metal), np.zeros_like(metal), smooth])
+    mask = np.dstack([metal, glassmask, np.zeros_like(metal), smooth])
     big = name in ("f1", "f2", "f4", "f6")
     save(alb, name + "_a", 2048 if big else size)
     save(nrm, name + "_n", size, True)

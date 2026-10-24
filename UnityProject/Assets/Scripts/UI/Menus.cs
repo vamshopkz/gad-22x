@@ -175,7 +175,7 @@ namespace Gad
         public static void RealEstate()
         {
             int tab = 0;
-            Window.Show("ГАД СИТИ · НЕДВИЖИМОСТЬ", w =>
+            Window.Show("GOD CITY · НЕДВИЖИМОСТЬ", w =>
             {
                 var tabs = new List<(string, Color, bool, System.Action)>
                 {
@@ -583,7 +583,7 @@ namespace Gad
                 UIKit.Fill(input.GetComponent<RectTransform>(), 0, 4, 220, 4);
                 var ok = UIKit.Button(row, "СОХРАНИТЬ", Green, () => { if (input.text.Trim().Length >= 2) { Save.D.name = input.text.Trim(); Save.Write(); Hud.Toast("Имя изменено"); } }, 24);
                 UIKit.Place(ok.Bg.rectTransform, new Vector2(1, 0.5f), new Vector2(1, 0.5f), Vector2.zero, new Vector2(210, 76));
-                w.Text("ГАД 2-2 X · версия " + Application.version + "\nУправление на компьютере: WASD — ходьба/руль, мышь (правая кнопка) — камера, Shift — бег, Пробел — прыжок/тормоз, E — действие, F — сесть/выйти.", 22, UIKit.Muted);
+                w.Text("GOD 2-2X · версия " + Application.version + "\nУправление на компьютере: WASD — ходьба/руль, мышь (правая кнопка) — камера, Shift — бег, Пробел — прыжок/тормоз, E — действие, F — сесть/выйти.", 22, UIKit.Muted);
             });
         }
 
@@ -591,33 +591,59 @@ namespace Gad
 
         static readonly (Wardrobe.Slot slot, string name)[] Depts =
         {
-            (Wardrobe.Slot.HGender, "Пол"), (Wardrobe.Slot.HSkin, "Кожа"), (Wardrobe.Slot.HHair, "Причёска"), (Wardrobe.Slot.HEyes, "Глаза"),
+            (Wardrobe.Slot.HGender, "Пол"), (Wardrobe.Slot.HFace, "Форма лица"), (Wardrobe.Slot.HSkin, "Кожа"), (Wardrobe.Slot.HHair, "Причёска"), (Wardrobe.Slot.HEyes, "Глаза"),
             (Wardrobe.Slot.HMouth, "Лицо"), (Wardrobe.Slot.HTop, "Верх"), (Wardrobe.Slot.HBottom, "Низ"), (Wardrobe.Slot.HShoes, "Обувь"), (Wardrobe.Slot.HAcc, "Аксессуары"),
         };
 
-        /// <summary>Character editor: free at home / at creation, paid in clothes shops.</summary>
+        /// <summary>First launch: the player must choose a nickname before anything else.</summary>
+        public static void Nick()
+        {
+            var w = Window.Show("ДОБРО ПОЖАЛОВАТЬ В GOD 2-2X", win =>
+            {
+                win.Text("Придумайте ник — его увидят другие игроки над вашей головой и в чате.", 28);
+                var row = UIKit.Rect("Nick", win.Content);
+                row.gameObject.AddComponent<LayoutElement>().minHeight = 96;
+                var input = UIKit.Input(row, "Ваш ник (3–16 символов)", 16, 38);
+                UIKit.Fill(input.GetComponent<RectTransform>(), 0, 6, 0, 6);
+                input.text = Save.D.name ?? "";
+                var info = win.Text("", 24, UIKit.Muted);
+                var go = win.Row("Готово", "Дальше — внешность персонажа", "ДАЛЕЕ", Green, null);
+                go.OnClick = () =>
+                {
+                    var n = (input.text ?? "").Trim().Replace("|", "");
+                    if (n.Length < 3) { info.text = "Ник слишком короткий — минимум 3 символа"; info.color = UIKit.Red; AudioFx.Play("error"); return; }
+                    Save.D.name = n;
+                    Save.Write();
+                    Window.Close();
+                    Dress(false, true);
+                };
+                input.onSubmit.AddListener(_ => go.OnClick());
+                input.Select(); input.ActivateInputField();
+            }, 1000, 560);
+            var close = w.GetComponentInChildren<UIButton>(true);
+            foreach (var b in w.GetComponentsInChildren<UIButton>(true)) if (b.name == "Close") b.gameObject.SetActive(false);
+            w.GetComponent<UnityEngine.UI.Image>().raycastTarget = true;
+            _ = close;
+        }
+
+        /// <summary>
+        /// Character editor (free at home / at creation, paid in clothes shops): a live 3D preview of
+        /// the character on the left, the clothes themselves as pictures on the right.
+        /// </summary>
         public static void Dress(bool paid, bool creation = false)
         {
             var look = Save.D.skin.Clone();
             const int Price = 350;
             int dept = creation ? 0 : 5;
-            Window.Show(creation ? "СОЗДАНИЕ ПЕРСОНАЖА" : paid ? "МАГАЗИН ОДЕЖДЫ" : "ГАРДЕРОБ", w =>
+            var studio = Studio.Get();
+            studio.SetLive(look);
+            var w = Window.Show(creation ? "СОЗДАНИЕ ПЕРСОНАЖА · " + Save.D.name : paid ? "МАГАЗИН ОДЕЖДЫ" : "ГАРДЕРОБ", win =>
             {
-                void Apply() { PlayerCtl.I.Body.Rebuild(look); Window.Refresh(); }
-                if (creation)
-                {
-                    var row = UIKit.Rect("Name", w.Content);
-                    row.gameObject.AddComponent<LayoutElement>().minHeight = 84;
-                    var input = UIKit.Input(row, "Ваше имя", 18);
-                    input.text = Save.D.name;
-                    UIKit.Fill(input.GetComponent<RectTransform>(), 0, 4, 0, 4);
-                    input.onEndEdit.AddListener(s => Save.D.name = s.Trim());
-                    input.onValueChanged.AddListener(s => Save.D.name = s.Trim());
-                }
+                void Apply() { PlayerCtl.I.Body.Rebuild(look); studio.SetLive(look); Window.Refresh(); }
                 string btn = creation ? "НАЧАТЬ ИГРУ" : paid ? "КУПИТЬ " + Hud.Money(Price) : "ГОТОВО";
-                w.Row(creation ? "Готово?" : "Сохранить образ", creation ? "Готовые образы — в Телефон → Скины" : paid ? "Новый образ сохранится" : "", btn, Green, () =>
+                win.Row(creation ? "Готово?" : "Сохранить образ", creation ? "Готовые образы — в Телефон → Скины" : paid ? "Новый образ сохранится" : "", btn, Green, () =>
                 {
-                    if (creation && (Save.D.name == null || Save.D.name.Length < 2)) { Hud.Toast("Введите имя (минимум 2 буквы)"); return; }
+                    if (creation && (Save.D.name == null || Save.D.name.Length < 3)) { Window.Close(); Nick(); return; }
                     if (paid && !Eco.Spend(Price, "Новый образ")) return;
                     Save.D.skin = look.Clone();
                     if (creation) Save.D.created = true;
@@ -625,24 +651,38 @@ namespace Gad
                     PlayerCtl.I.Body.Rebuild(Save.D.skin);
                     WorldNet.LookChanged();
                     Window.Close();
-                    if (creation) Hud.Toast("Добро пожаловать в ГАД 2-2 X, " + Save.D.name + "!", UIKit.Cyan);
+                    if (creation) Hud.Toast("Добро пожаловать в GOD 2-2X, " + Save.D.name + "!", UIKit.Cyan);
                 });
                 var tabs = new List<(string, Color, bool, System.Action)>();
                 for (int i = 0; i < Depts.Length; i++) { int k = i; tabs.Add((Depts[i].name, new Color(0.2f, 0.4f, 0.75f), dept == i, () => { dept = k; Window.Refresh(); })); }
-                w.Chips("Раздел", tabs);
+                win.Chips("Раздел", tabs);
                 var slot = Depts[dept].slot;
-                var items = new List<(string, Color, bool, System.Action)>();
+                var cells = new List<(string id, string label, bool sel, System.Action act, SkinSet with)>();
                 foreach (var d in global::Gad.Wardrobe.OfSlot(slot))
                 {
                     if (slot == global::Gad.Wardrobe.Slot.HTop && d.style == "kit") continue;
                     if (slot == global::Gad.Wardrobe.Slot.HSkin && (d.style == "gold" || d.id == "hs_alien") && !creation && !Save.D.skins.Contains(d.id)) continue;
                     var def = d;
-                    bool sel = look.Get(slot) == d.id;
-                    var col = d.none ? Grey : Color.Lerp(d.color, Grey, 0.15f);
-                    items.Add((d.name, col, sel, () => { look.Set(slot, def.id); if (slot == global::Gad.Wardrobe.Slot.HTop && def.style == "dress") look.hBottom = "hb_none"; Apply(); }));
+                    var with = look.Clone();
+                    with.Set(slot, d.id);
+                    if (slot == global::Gad.Wardrobe.Slot.HTop && d.style == "dress") with.hBottom = "hb_none";
+                    cells.Add((d.id, d.name, look.Get(slot) == d.id, () => { look.Set(slot, def.id); if (slot == global::Gad.Wardrobe.Slot.HTop && def.style == "dress") look.hBottom = "hb_none"; Apply(); }, with));
                 }
-                w.Chips(Depts[dept].name, items);
-            }, 1180, 860).OnClose = () => { if (PlayerCtl.I != null) PlayerCtl.I.Body.Rebuild(Save.D.skin); if (creation && !Save.D.created) { Save.D.created = true; if (string.IsNullOrEmpty(Save.D.name)) Save.D.name = "Игрок" + Random.Range(100, 999); Save.Write(); } };
+                win.ItemGrid(cells, slot, look);
+            }, 1560, 880);
+            // the live preview stands on the left of the window
+            var panel = w.transform.GetChild(0) as RectTransform;
+            var view = panel.Find("Viewport") as RectTransform;
+            if (view != null) view.offsetMin = new Vector2(440, view.offsetMin.y);
+            var raw = UIKit.Rect("Preview", panel).gameObject.AddComponent<RawImage>();
+            raw.texture = studio.LiveRT;
+            UIKit.Place(raw.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(24, -10), new Vector2(400, 667));
+            w.OnClose = () =>
+            {
+                Studio.Get().Hide();
+                if (PlayerCtl.I != null) PlayerCtl.I.Body.Rebuild(Save.D.skin);
+                if (creation && !Save.D.created) { Save.D.created = true; if (string.IsNullOrEmpty(Save.D.name)) Save.D.name = "Игрок" + Random.Range(100, 999); Save.Write(); }
+            };
         }
 
         /// <summary>Ready-made looks: tap to wear (bought ones stay yours).</summary>

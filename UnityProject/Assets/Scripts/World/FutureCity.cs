@@ -176,7 +176,7 @@ namespace Gad
                 go.transform.rotation = Quaternion.Euler(0, yaw, 0);
                 var t = go.AddComponent<TextMeshPro>();
                 t.font = UIKit.Font; t.fontSharedMaterial = UIKit.TextOutline;
-                t.text = "ГАД СИТИ"; t.fontSize = 40; t.alignment = TextAlignmentOptions.Center;
+                t.text = "GOD CITY"; t.fontSize = 40; t.alignment = TextAlignmentOptions.Center;
                 t.color = new Color(0.4f, 0.95f, 1f);
                 t.rectTransform.sizeDelta = new Vector2(30, 8);
                 t.textWrappingMode = TextWrappingModes.NoWrap;
@@ -332,7 +332,7 @@ namespace Gad
     {
         static readonly string[] Ads =
         {
-            "ГАД 2-2 X\nДОБРО ПОЖАЛОВАТЬ В БУДУЩЕЕ", "ЭЛЕКТРОКАР VOLT\n0–100 ЗА 2,9 С", "ГАД СИТИ\nПЕНТХАУСЫ С ВИДОМ НА МОРЕ",
+            "GOD 2-2X\nДОБРО ПОЖАЛОВАТЬ В БУДУЩЕЕ", "ЭЛЕКТРОКАР VOLT\n0–100 ЗА 2,9 С", "GOD CITY\nПЕНТХАУСЫ С ВИДОМ НА МОРЕ",
             "АЭРОТАКСИ\nВЫШЕ ПРОБОК", "НЕОН КОЛА\nВКУС НОЧНОГО ГОРОДА", "BMW 5 SERIES\nДИНАМИКА БИЗНЕСА", "ТРЦ «МЕГА»\nСКИДКИ ДО 70%", "РАБОТА МЕЧТЫ\nЦЕНТР ЗАНЯТОСТИ",
         };
         TextMeshPro text;
