@@ -398,6 +398,28 @@ namespace Gad
             Menus.Phone(); yield return Wait(0.4f); yield return Shot("60_phone"); Window.Close();
             Menus.Map(); yield return Wait(0.4f); yield return Shot("61_map"); Window.Close();
             Menus.Dress(false, true); yield return Wait(5f); yield return Shot("62_create"); Window.Close();
+            // title screen
+            MainMenu.Show(); yield return Wait(1.5f); yield return Shot("66_main_menu");
+            Check("главное меню открыто, HUD спрятан", MainMenu.Open && !UIRoot.HudLayer.gameObject.activeSelf);
+            MainMenu.Hide(); yield return null;
+            Check("из меню в игру", !MainMenu.Open && UIRoot.HudLayer.gameObject.activeSelf && !PlayerCtl.ShotCam);
+            // touch camera: a new touch reusing a finger id must not throw the camera to the old spot
+            {
+                var la = FindFirstObjectByType<LookArea>();
+                var es = UnityEngine.EventSystems.EventSystem.current;
+                float yaw0 = pl.Yaw, pitch0 = pl.Pitch;
+                var e = new UnityEngine.EventSystems.PointerEventData(es) { pointerId = 0, position = new Vector2(Screen.width * 0.8f, Screen.height * 0.2f) };
+                la.OnPointerDown(e); la.OnPointerUp(e);
+                e = new UnityEngine.EventSystems.PointerEventData(es) { pointerId = 0, position = new Vector2(Screen.width * 0.3f, Screen.height * 0.7f), delta = new Vector2(-900, 500) };
+                la.OnPointerDown(e);
+                e.position += new Vector2(40, 0); e.delta = new Vector2(-860, 500); la.OnDrag(e);
+                yield return null;
+                float dy = Mathf.DeltaAngle(yaw0, pl.Yaw);
+                Check("камера пальцем: вправо → вправо, без рывка", dy > 2f && dy < 30f && Mathf.Abs(pl.Pitch - pitch0) < 3f, $"поворот {dy:0.0}°");
+                e.position += new Vector2(0, -60); la.OnDrag(e); yield return null;
+                Check("камера пальцем: вниз → смотрит вниз", pl.Pitch > pitch0 + 1f, $"наклон {pl.Pitch - pitch0:0.0}°");
+                la.OnPointerUp(e);
+            }
             Menus.CarDealer(dealer); yield return Wait(0.4f); yield return Shot("63_dealer"); Window.Close();
             Menus.Skins(); yield return Wait(0.4f); yield return Shot("64_skins"); Window.Close();
             int bad = 0;

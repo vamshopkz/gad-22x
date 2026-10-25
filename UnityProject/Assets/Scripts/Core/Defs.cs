@@ -47,12 +47,12 @@ namespace Gad
             [BType.JobCenter] = new BInfo { Title = "Центр занятости", Names = new[] { "Центр занятости" }, Sign = new Color(0.15f, 0.6f, 0.8f) },
             [BType.GasStation] = new BInfo { Title = "Заправка", Names = new[] { "АЗС «Петрол»", "АЗС «Газ+»" }, BizPrice = 110000, Sign = new Color(0.1f, 0.65f, 0.3f) },
             [BType.Parking] = new BInfo { Title = "Подземная парковка", Names = new[] { "Паркинг P1", "Паркинг P2", "Паркинг «Центр»" }, BizPrice = 150000, Sign = new Color(0.15f, 0.4f, 0.9f) },
-            [BType.Airport] = new BInfo { Title = "Аэропорт", Names = new[] { "Аэропорт GOD" }, Sign = new Color(0.2f, 0.5f, 0.9f) },
+            [BType.Airport] = new BInfo { Title = "Аэропорт", Names = new[] { "Аэропорт Herbal" }, Sign = new Color(0.2f, 0.5f, 0.9f) },
             [BType.Station] = new BInfo { Title = "Вокзал", Names = new[] { "Центральный вокзал" }, Sign = new Color(0.35f, 0.35f, 0.75f) },
             [BType.Port] = new BInfo { Title = "Морской порт", Names = new[] { "Морской порт" }, Sign = new Color(0.1f, 0.4f, 0.7f) },
             [BType.Clothes] = new BInfo { Title = "Магазин одежды", Names = new[] { "Бутик «Стиль»", "Одежда «Тренд»", "Мода Плюс" }, BizPrice = 75000, Sign = new Color(0.9f, 0.3f, 0.6f) },
             [BType.Furniture] = new BInfo { Title = "Мебельный", Names = new[] { "Мебель «Дом»", "Интерьер Центр" }, BizPrice = 85000, Sign = new Color(0.6f, 0.45f, 0.3f) },
-            [BType.Agency] = new BInfo { Title = "Агентство недвижимости", Names = new[] { "GOD City · Недвижимость" }, Sign = new Color(0.2f, 0.9f, 1f) },
+            [BType.Agency] = new BInfo { Title = "Агентство недвижимости", Names = new[] { "Herbal City · Недвижимость" }, Sign = new Color(0.2f, 0.9f, 1f) },
             [BType.Gym] = new BInfo { Title = "Спортзал", Names = new[] { "Фитнес «Сила»", "Спортзал «Атлет»" }, BizPrice = 65000, Sign = new Color(0.95f, 0.35f, 0.1f) },
         };
     }

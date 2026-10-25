@@ -864,7 +864,7 @@ namespace Gad
                     Sofa(new Vector3(9, 0, 4), 270, new Color(0.9f, 0.9f, 0.92f)); Sofa(new Vector3(-6, 0, 4), 90, new Color(0.9f, 0.9f, 0.92f));
                     for (int k = 0; k < 4; k++) Npc(new Vector3(-4 + k * 3, 0, 6 + (k % 2) * 2), k * 90, b.id + 40 + k, 0);
                     Plant(new Vector3(-13.5f, 0, 20.5f), 1.4f); Plant(new Vector3(13.5f, 0, 1.5f), 1.4f);
-                    Sign(new Vector3(0, 5.6f, 21.8f), "GOD CITY · НЕДВИЖИМОСТЬ", new Color(0.2f, 0.9f, 1f), 7);
+                    Sign(new Vector3(0, 5.6f, 21.8f), "HERBAL CITY · НЕДВИЖИМОСТЬ", new Color(0.2f, 0.9f, 1f), 7);
                     Sign(new Vector3(EX, 3.4f, 21.85f), "ЛИФТ · 20 ЭТАЖЕЙ", Color.white, 2.5f);
                     for (int k = 0; k < 3; k++) Point(new Vector3(-8 + k * 8, 0, 16.2f), "АГЕНТ: КУПИТЬ ЖИЛЬЁ", () => Menus.RealEstate());
                     Point(new Vector3(2, 0, 6), "МАКЕТ ГОРОДА: ВСЁ ЖИЛЬЁ", () => Menus.RealEstate());
@@ -1054,7 +1054,7 @@ namespace Gad
                         if (rng.Chance(0.55f)) Npc(p + new Vector3(0, 0, -0.75f), 0, b.id * 13 + (int)(x * 7 + z * 3) + floor * 101, 2, 3);
                     }
                 Plant(new Vector3(-w / 2 + 1, 0, d - 1)); Plant(new Vector3(w / 2 - 1, 0, d - 1));
-                string title = b.type == BType.Agency ? "АГЕНТСТВО «GOD CITY» · ЭТАЖ " + (floor + 1) : b.name + " · ЭТАЖ " + (floor + 1);
+                string title = b.type == BType.Agency ? "АГЕНТСТВО «HERBAL CITY» · ЭТАЖ " + (floor + 1) : b.name + " · ЭТАЖ " + (floor + 1);
                 Sign(new Vector3(0, 2.8f, d - 0.1f), title, b.Info.Sign, 4);
                 Point(new Vector3(3.5f, 0, 3.5f), b.type == BType.Agency ? "АГЕНТ: КУПИТЬ ЖИЛЬЁ" : "РЕСЕПШН: РАБОТА И БИЗНЕС", () => { if (b.type == BType.Agency) Menus.RealEstate(); else Menus.Building(b); });
             }

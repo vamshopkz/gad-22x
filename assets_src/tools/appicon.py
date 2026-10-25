@@ -1,4 +1,4 @@
-"""GOD 2-2X app icon: the night skyline from the game with the logo. Usage: python3 appicon.py shot.png outdir"""
+"""Herbal app icon: the night skyline from the game with the logo. Usage: python3 appicon.py shot.png outdir"""
 import sys
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 shot, out = sys.argv[1], sys.argv[2]
@@ -7,18 +7,23 @@ bg = im.crop((int(232*k), int(60*k), int(612*k), int(440*k))).resize((1024, 1024
 bg = ImageEnhance.Color(ImageEnhance.Brightness(bg).enhance(1.25)).enhance(1.25)
 F = "/System/Library/Fonts/Supplemental/Impact.ttf"
 def logo(size, scale=1.0):
+    """HERBAL in white with a green outline glow and a leaf over the A."""
     L = Image.new("RGBA", size, (0, 0, 0, 0)); d = ImageDraw.Draw(L)
-    big = ImageFont.truetype(F, int(330*scale)); mid = ImageFont.truetype(F, int(250*scale))
-    cx = size[0] // 2
-    parts = [("2-2", mid, (255, 150, 20)), ("X", mid, (235, 30, 40))]
-    # GOD on top, 2-2X below
-    def stroke_text(xy, s, font, fill, anchor):
-        d.text(xy, s, font=font, fill=fill, anchor=anchor, stroke_width=int(14*scale), stroke_fill=(10, 10, 20))
-    stroke_text((cx, int(size[1]*0.52)), "GOD", big, (255, 255, 255), "ms")
-    w22 = d.textlength("2-2", font=mid); wx = d.textlength("X", font=mid); gap = 14*scale
-    x0 = cx - (w22 + gap + wx) / 2; y = int(size[1]*0.52 + 250*scale)
-    stroke_text((x0, y), "2-2", mid, parts[0][2], "ls"); stroke_text((x0 + w22 + gap, y), "X", mid, parts[1][2], "ls")
-    glow = L.filter(ImageFilter.GaussianBlur(18*scale)); g = Image.new("RGBA", size, (255, 120, 30, 0)); g.putalpha(glow.split()[3].point(lambda a: a*0.6))
+    font = ImageFont.truetype(F, int(250*scale))
+    cx, y = size[0] // 2, int(size[1]*0.6)
+    d.text((cx, y), "HERBAL", font=font, fill=(255, 255, 255), anchor="ms", stroke_width=int(14*scale), stroke_fill=(8, 40, 14))
+    w = d.textlength("HERBAL", font=font)
+    # a leaf above the text: two arcs meeting at the tips, with a vein
+    lx, ly, lw, lh = cx + w*0.18, y - 300*scale, 150*scale, 90*scale
+    import math
+    pts = [(lx + lw*math.cos(a)*0.5*(1 if i < 20 else 1), ly - lh*math.sin(a)*0.5*(1 if i < 20 else -1)) for i, a in enumerate([k*math.pi/19 for k in range(20)] + [k*math.pi/19 for k in range(19, -1, -1)])]
+    pts = [(lx - lw/2 + lw*k/19, ly - lh/2*math.sin(k*math.pi/19)) for k in range(20)] + [(lx + lw/2 - lw*k/19, ly + lh/2*math.sin(k*math.pi/19)) for k in range(20)]
+    leaf = Image.new("RGBA", size, (0, 0, 0, 0)); ld = ImageDraw.Draw(leaf)
+    ld.polygon(pts, fill=(70, 220, 90), outline=(8, 40, 14))
+    ld.line([(lx - lw/2, ly), (lx + lw/2, ly)], fill=(20, 110, 40), width=int(8*scale))
+    leaf = leaf.rotate(30, center=(lx, ly), resample=Image.BICUBIC)
+    L = Image.alpha_composite(L, leaf)
+    glow = L.filter(ImageFilter.GaussianBlur(20*scale)); g = Image.new("RGBA", size, (60, 255, 110, 0)); g.putalpha(glow.split()[3].point(lambda a: a*0.7))
     return Image.alpha_composite(g, L)
 shade = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0)); sd = ImageDraw.Draw(shade)
 for y in range(1024): sd.line([(0, y), (1024, y)], fill=(5, 5, 15, int(150 * max(0, (y - 380) / 644))))

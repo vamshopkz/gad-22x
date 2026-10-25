@@ -27,6 +27,7 @@ namespace Gad
                 w.Row("Такси (быстро)", "Перенестись в любое место города за $60", "ВЫБРАТЬ", Orange, () => Travel(null));
                 w.Row("Скины", "Готовые образы: бизнесмен, киберпанк, инопланетянин…", "СКИНЫ", new Color(0.55f, 0.3f, 0.9f), Skins);
                 w.Row("Настройки", "Графика, звук, имя", "ОТКРЫТЬ", Grey, Settings);
+                w.Row("Главное меню", "Выйти на титульный экран Herbal", "МЕНЮ", Grey, MainMenu.Show);
             });
         }
 
@@ -175,7 +176,7 @@ namespace Gad
         public static void RealEstate()
         {
             int tab = 0;
-            Window.Show("GOD CITY · НЕДВИЖИМОСТЬ", w =>
+            Window.Show("HERBAL CITY · НЕДВИЖИМОСТЬ", w =>
             {
                 var tabs = new List<(string, Color, bool, System.Action)>
                 {
@@ -583,7 +584,7 @@ namespace Gad
                 UIKit.Fill(input.GetComponent<RectTransform>(), 0, 4, 220, 4);
                 var ok = UIKit.Button(row, "СОХРАНИТЬ", Green, () => { if (input.text.Trim().Length >= 2) { Save.D.name = input.text.Trim(); Save.Write(); Hud.Toast("Имя изменено"); } }, 24);
                 UIKit.Place(ok.Bg.rectTransform, new Vector2(1, 0.5f), new Vector2(1, 0.5f), Vector2.zero, new Vector2(210, 76));
-                w.Text("GOD 2-2X · версия " + Application.version + "\nУправление на компьютере: WASD — ходьба/руль, мышь (правая кнопка) — камера, Shift — бег, Пробел — прыжок/тормоз, E — действие, F — сесть/выйти.", 22, UIKit.Muted);
+                w.Text("Herbal · версия " + Application.version + "\nУправление на компьютере: WASD — ходьба/руль, мышь (правая кнопка) — камера, Shift — бег, Пробел — прыжок/тормоз, E — действие, F — сесть/выйти.", 22, UIKit.Muted);
             });
         }
 
@@ -598,7 +599,7 @@ namespace Gad
         /// <summary>First launch: the player must choose a nickname before anything else.</summary>
         public static void Nick()
         {
-            var w = Window.Show("ДОБРО ПОЖАЛОВАТЬ В GOD 2-2X", win =>
+            var w = Window.Show("ДОБРО ПОЖАЛОВАТЬ В Herbal", win =>
             {
                 win.Text("Придумайте ник — его увидят другие игроки над вашей головой и в чате.", 28);
                 var row = UIKit.Rect("Nick", win.Content);
@@ -651,7 +652,7 @@ namespace Gad
                     PlayerCtl.I.Body.Rebuild(Save.D.skin);
                     WorldNet.LookChanged();
                     Window.Close();
-                    if (creation) Hud.Toast("Добро пожаловать в GOD 2-2X, " + Save.D.name + "!", UIKit.Cyan);
+                    if (creation) Hud.Toast("Добро пожаловать в Herbal, " + Save.D.name + "!", UIKit.Cyan);
                 });
                 var tabs = new List<(string, Color, bool, System.Action)>();
                 for (int i = 0; i < Depts.Length; i++) { int k = i; tabs.Add((Depts[i].name, new Color(0.2f, 0.4f, 0.75f), dept == i, () => { dept = k; Window.Refresh(); })); }

@@ -292,7 +292,7 @@ public static class ProjectSetup
     static void SetupPlayer()
     {
         PlayerSettings.companyName = "Aleksandr Kuzmenko";
-        PlayerSettings.productName = "GOD 2-2X";
+        PlayerSettings.productName = "Herbal";
         PlayerSettings.colorSpace = ColorSpace.Linear;
         PlayerSettings.runInBackground = true;
         PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.aleksandrkuzmenko.gad22x");

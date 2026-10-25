@@ -56,8 +56,7 @@ namespace Gad
 
             if (Has("-autotest")) gameObject.AddComponent<AutoTest>();
             else if (Has("-mptest")) gameObject.AddComponent<AutoTest>().Multiplayer = true;
-            else if (!Save.D.created || string.IsNullOrEmpty(Save.D.name) || Save.D.name.Length < 3) Menus.Nick();
-            else Hud.Toast("С возвращением, " + Save.D.name + "!", UIKit.Cyan);
+            else MainMenu.Show();
         }
 
         void Update()
@@ -70,9 +69,9 @@ namespace Gad
                 Save.D.px = p.x; Save.D.py = p.y; Save.D.pz = p.z; Save.D.pyaw = pl.transform.eulerAngles.y;
             }
             if (!Has("-autotest") && !Has("-mptest")) Save.Tick();
-            if (Input.GetKeyDown(KeyCode.Escape)) { if (UIRoot.Open != null) Window.Close(); else Menus.Phone(); }
-            if (Input.GetKeyDown(KeyCode.M) && !UIRoot.TypingText) { if (UIRoot.Open != null) Window.Close(); else Menus.Map(); }
-            if (Input.GetKeyDown(KeyCode.Return) && !UIRoot.TypingText && UIRoot.Open == null) Menus.Chat();
+            if (Input.GetKeyDown(KeyCode.Escape)) { if (UIRoot.Open != null) Window.Close(); else if (!MainMenu.Open) Menus.Phone(); }
+            if (Input.GetKeyDown(KeyCode.M) && !UIRoot.TypingText && !MainMenu.Open) { if (UIRoot.Open != null) Window.Close(); else Menus.Map(); }
+            if (Input.GetKeyDown(KeyCode.Return) && !UIRoot.TypingText && UIRoot.Open == null && !MainMenu.Open) Menus.Chat();
         }
 
         void OnApplicationPause(bool paused) { if (paused && !Has("-autotest")) Save.Write(); }

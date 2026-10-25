@@ -73,7 +73,7 @@ namespace Gad
 
         void Keys()
         {
-            if (UIRoot.TypingText) return;
+            if (UIRoot.TypingText || MainMenu.Open) return;
             var k = new Vector2((Input.GetKey(KeyCode.D) ? 1 : 0) - (Input.GetKey(KeyCode.A) ? 1 : 0), (Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.S) ? 1 : 0));
             if (Input.GetKey(KeyCode.RightArrow)) k.x = 1; if (Input.GetKey(KeyCode.LeftArrow)) k.x = -1;
             if (Input.GetKey(KeyCode.UpArrow)) k.y = 1; if (Input.GetKey(KeyCode.DownArrow)) k.y = -1;

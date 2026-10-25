@@ -289,16 +289,31 @@ namespace Gad
         }
     }
 
-    /// <summary>Drag anywhere on the right part of the screen to turn the camera.</summary>
+    /// <summary>
+    /// Drag anywhere on the right part of the screen to turn the camera: the view follows the finger
+    /// (left→right turns right, up→down looks down). The movement is measured from where this finger
+    /// touched, not from Unity's delta: on phones a finger id is reused, and the first delta of a new
+    /// touch is measured from where the previous touch with that id ended (e.g. the jump button),
+    /// which threw the camera there.
+    /// </summary>
     public class LookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
     {
         int pointer = int.MinValue;
-        public void OnPointerDown(PointerEventData e) { if (pointer == int.MinValue) { pointer = e.pointerId; UIRoot.LookActive = true; } }
+        Vector2 last;
+        public void OnPointerDown(PointerEventData e)
+        {
+            if (pointer != int.MinValue) return;
+            pointer = e.pointerId; last = e.position; UIRoot.LookActive = true;
+        }
         public void OnDrag(PointerEventData e)
         {
             if (e.pointerId != pointer || PlayerCtl.I == null) return;
+            var d = e.position - last;
+            last = e.position;
+            float lim = Screen.height * 0.25f;
+            if (d.sqrMagnitude > lim * lim) return;   // a stray jump, never a real finger move
             float k = 1600f / Mathf.Max(800, Screen.width) * 0.9f;
-            PlayerCtl.I.LookDelta += new Vector2(e.delta.x * k, -e.delta.y * k * 0.8f);
+            PlayerCtl.I.LookDelta += new Vector2(d.x * k, -d.y * k * 0.8f);
         }
         public void OnPointerUp(PointerEventData e) { if (e.pointerId == pointer) { pointer = int.MinValue; UIRoot.LookActive = false; } }
         void OnDisable() { pointer = int.MinValue; UIRoot.LookActive = false; }
