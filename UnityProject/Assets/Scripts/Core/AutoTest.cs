@@ -455,6 +455,16 @@ namespace Gad
             while (Time.realtimeSinceStartup - t0 < 2f) { frames++; yield return null; }
             fps = frames / (Time.realtimeSinceStartup - t0);
             Check("FPS (Mac)", fps > 20, fps.ToString("0"));
+            {
+                var people = FindObjectsByType<Person>(FindObjectsSortMode.None);
+                long tris = 0; int rends = 0;
+                foreach (var p in people) foreach (var mf in p.GetComponentsInChildren<MeshFilter>()) { rends++; if (mf.sharedMesh != null) tris += mf.sharedMesh.triangles.Length / 3; }
+                foreach (var p in people) p.gameObject.SetActive(false);
+                frames = 0; t0 = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - t0 < 2f) { frames++; yield return null; }
+                Debug.Log($"[AutoTest] PERF people={people.Length} renderers={rends} tris={tris} fps_with={fps:0} fps_without={frames / (Time.realtimeSinceStartup - t0):0}");
+                foreach (var p in people) if (p != null) p.gameObject.SetActive(true);
+            }
             Finish();
         }
 

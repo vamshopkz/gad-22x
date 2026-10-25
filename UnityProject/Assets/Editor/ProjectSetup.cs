@@ -134,6 +134,7 @@ public static class ProjectSetup
         Tex("Assets/Resources/PH", p => (p.Contains("_nor"), false, p.Contains("_nor") ? 512 : 1024));
         Tex("Assets/Resources/Facades", p => (p.EndsWith("_n.png"), p.EndsWith("_m.png"), p.EndsWith("_a.png") ? 2048 : 1024));
         Tex("Assets/Resources/Models", p => (false, false, 1024));
+        Tex("Assets/Resources/Heads", p => (p.EndsWith("_n.png"), false, 1024));
         foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { "Assets/Resources/Models" }))
         {
             var path = AssetDatabase.GUIDToAssetPath(guid);

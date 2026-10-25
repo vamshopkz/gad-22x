@@ -17,6 +17,10 @@ namespace Gad
         /// <summary>Metres of the finished character per unit of the reference 1.75 m body.</summary>
         public float scale = 1f;
         public Human.Shape shape;
+        /// <summary>0.6: the realistic head (null on mannequins) and where its eyes sit on the head bone.</summary>
+        public Renderer realHead;
+        public Vector3 realEye;
+        public float realK = 1f;
         public Transform[] Joints => new[] { hips, torso, neck, head, uArmL, uArmR, fArmL, fArmR, handL, handR, thighL, thighR, shinL, shinR, footL, footR };
         /// <summary>2.17: finger bones (thumb, index, middle, ring, little; three joints each) of each hand.</summary>
         public Transform[][] fingersL, fingersR;
@@ -426,17 +430,22 @@ namespace Gad
             Part("body_torso", Loft("torso2_" + sk, s.torso, s.torso.Y0, s.torso.Y1, 0f, true, true, 40, 56, bump: TorsoBump(s)), mat, h.torso);
             // Collarbones and shoulder caps round the top of the chest off.
             foreach (var side in new[] { -1f, 1f })
-                Part("body_shoulder", Loft("deltoid_" + sk, s.uArm, -0.06f, s.uArm.Y1, 0.004f, true, true, 8), mat, h.torso, Bones.ShoulderFromTorso(s, side));
+                Part("body_shoulder", Loft("deltoid2_" + sk, s.uArm, -0.06f, 0.048f, 0.004f, true, true, 8), mat, h.torso, Bones.ShoulderFromTorso(s, side), null, new Vector3(1f, 0.72f, 1f));   // rounded, not a cone poking through clothes
             h.neck = Bone("neck", h.torso, Bones.NeckFromTorso);
             Part("body_neck", Loft("neck2_" + sk, s.neck, s.neck.Y0, s.neck.Y1, 0f, true, true, 10, 32, bump: (a, y) => G(a, 70f, 10f, y, 0.04f, 0.04f, 0.0025f) + G(a, 110f, 10f, y, 0.04f, 0.04f, 0.0025f) + (s.female ? 0f : G(a, 90f, 8f, y, 0.05f, 0.012f, 0.004f))), mat, h.neck);
             h.head = Bone("head", h.neck, Bones.HeadFromNeck);
-            BuildHead(h, mannequin ? mat : FaceMat(skin, female));
+            if (mannequin || !RealHeadAvailable(female) || !BuildRealHead(h, skin)) BuildHead(h, mannequin ? mat : FaceMat(skin, female));
+            else
+            {   // the sculpted neck is slimmer: tuck the old neck inside it so it does not show under the chin
+                var neckPart = h.neck.Find("body_neck");
+                if (neckPart != null) { neckPart.localScale = new Vector3(0.82f, 1f, 0.8f); neckPart.localPosition += new Vector3(0f, 0f, -0.004f); }
+            }
 
             foreach (var side in new[] { -1f, 1f })
             {
                 bool right = side > 0f;
                 var ua = Bone(right ? "arm-right" : "arm-left", h.torso, Bones.ShoulderFromTorso(s, side));
-                Part("body_uarm", Loft("uarm2_" + sk, s.uArm, s.uArm.Y0 - 0.012f, s.uArm.Y1, 0f, true, true, 24, 32, bump: UArmBump), mat, ua);
+                Part("body_uarm", Loft("uarm3_" + sk, s.uArm, s.uArm.Y0 - 0.012f, 0.044f, 0f, true, true, 24, 32, bump: UArmBump), mat, ua);   // the profile above 0.044 narrows to a point that poked through sleeves
                 var fa = Bone(right ? "forearm-right" : "forearm-left", ua, Bones.ElbowFromShoulder);
                 Part("body_farm", Loft("farm2_" + sk, s.fArm, s.fArm.Y0, s.fArm.Y1, 0f, true, true, 20, 32, bump: FArmBump), mat, fa);
                 var hd = Bone(right ? "hand-right" : "hand-left", fa, Bones.WristFromElbow);

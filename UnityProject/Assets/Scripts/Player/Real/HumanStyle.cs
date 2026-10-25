@@ -91,6 +91,40 @@ namespace Gad
             A(Slot.HTop, "ht_print_hay", "Футболка HAY HUNTER", "tee", P("green"), Rarity.Rare, P("white"), pattern: "hay");
             A(Slot.HTop, "ht_stripes", "Тельняшка", "tee", P("white"), Rarity.Uncommon, P("navy"), pattern: "stripes");
             A(Slot.HTop, "ht_stripes_red", "Полосатая красная", "tee", P("white"), Rarity.Uncommon, P("red"), pattern: "stripes");
+            // 0.6: more tees: camouflage, polka dots, tie-dye, ombre, stripes, prints
+            Color Cc2(float r, float g, float b) => new Color(r, g, b);
+            A(Slot.HTop, "ht_camo_green", "Камуфляжная футболка", "tee", Cc2(0.36f, 0.4f, 0.24f), Rarity.Uncommon, Cc2(0.55f, 0.5f, 0.32f), pattern: "camo");
+            A(Slot.HTop, "ht_camo_urban", "Городской камуфляж", "tee", Cc2(0.55f, 0.56f, 0.58f), Rarity.Uncommon, Cc2(0.3f, 0.31f, 0.33f), pattern: "camo");
+            A(Slot.HTop, "ht_camo_pink", "Розовый камуфляж", "tee", P("pink"), Rarity.Rare, P("white"), pattern: "camo");
+            A(Slot.HTop, "ht_dots_white", "Футболка в горошек", "tee", P("white"), Rarity.Uncommon, P("black"), pattern: "dots");
+            A(Slot.HTop, "ht_dots_red", "Красная в белый горошек", "tee", P("red"), Rarity.Uncommon, P("white"), pattern: "dots");
+            A(Slot.HTop, "ht_dots_navy", "Синяя в горошек", "tee", P("navy"), Rarity.Uncommon, P("white"), pattern: "dots");
+            A(Slot.HTop, "ht_tiedye_rainbow", "Тай-дай радуга", "tee", P("pink"), Rarity.Rare, P("cyan"), pattern: "tiedye");
+            A(Slot.HTop, "ht_tiedye_sunset", "Тай-дай закат", "tee", P("orange"), Rarity.Rare, P("purple"), pattern: "tiedye");
+            A(Slot.HTop, "ht_tiedye_ocean", "Тай-дай океан", "tee", P("blue"), Rarity.Rare, P("lime"), pattern: "tiedye");
+            A(Slot.HTop, "ht_ombre_sunset", "Градиент закат", "tee", P("yellow"), Rarity.Uncommon, P("red"), pattern: "ombre");
+            A(Slot.HTop, "ht_ombre_sky", "Градиент небо", "tee", P("white"), Rarity.Uncommon, P("sky"), pattern: "ombre");
+            A(Slot.HTop, "ht_ombre_neon", "Градиент неон", "tee", P("cyan"), Rarity.Rare, P("purple"), pattern: "ombre");
+            A(Slot.HTop, "ht_stripes_black", "Чёрно-белая полоска", "tee", P("black"), Rarity.Uncommon, P("white"), pattern: "stripes");
+            A(Slot.HTop, "ht_stripes_mint", "Мятная полоска", "tee", Cc2(0.7f, 0.95f, 0.85f), Rarity.Uncommon, P("white"), pattern: "stripes");
+            A(Slot.HTop, "ht_vstripes_blue", "Футболка в вертикальную полоску", "tee", P("white"), Rarity.Uncommon, P("blue"), pattern: "vstripes");
+            A(Slot.HTop, "ht_print_leaf", "Футболка Herbal", "tee", P("black"), Rarity.Rare, P("lime"), pattern: "leaf");
+            A(Slot.HTop, "ht_print_leaf_w", "Белая футболка Herbal", "tee", P("white"), Rarity.Rare, P("green"), pattern: "leaf");
+            foreach (var (k, n, c) in new[] { ("beige", "Бежевая футболка", Cc2(0.86f, 0.78f, 0.64f)), ("olive", "Оливковая футболка", Cc2(0.42f, 0.45f, 0.25f)), ("mint", "Мятная футболка", Cc2(0.65f, 0.92f, 0.8f)), ("lilac", "Сиреневая футболка", Cc2(0.75f, 0.65f, 0.92f)), ("maroon", "Бордовая футболка", P("maroon")), ("sky", "Голубая футболка", P("sky")) })
+                A(Slot.HTop, "ht_tee_" + k, n, "tee", c);
+            A(Slot.HTop, "ht_hoodie_camo", "Камуфляжное худи", "hoodie", Cc2(0.36f, 0.4f, 0.24f), Rarity.Rare, Cc2(0.55f, 0.5f, 0.32f), pattern: "camo");
+            A(Slot.HTop, "ht_hoodie_tiedye", "Худи тай-дай", "hoodie", P("pink"), Rarity.Epic, P("cyan"), pattern: "tiedye");
+            A(Slot.HTop, "ht_hoodie_ombre", "Худи градиент", "hoodie", P("purple"), Rarity.Rare, P("cyan"), pattern: "ombre");
+            A(Slot.HTop, "ht_hoodie_beige", "Бежевое худи", "hoodie", Cc2(0.86f, 0.78f, 0.64f), Rarity.Uncommon);
+            A(Slot.HTop, "ht_hoodie_lilac", "Сиреневое худи", "hoodie", Cc2(0.75f, 0.65f, 0.92f), Rarity.Uncommon);
+            A(Slot.HTop, "ht_shirt_pink", "Розовая рубашка", "shirt", Cc2(0.98f, 0.78f, 0.82f), Rarity.Uncommon);
+            A(Slot.HTop, "ht_shirt_black", "Чёрная рубашка", "shirt", P("black"), Rarity.Uncommon);
+            A(Slot.HTop, "ht_shirt_mint", "Мятная рубашка", "shirt", Cc2(0.7f, 0.93f, 0.84f), Rarity.Uncommon);
+            A(Slot.HTop, "ht_shirt_denim", "Джинсовая рубашка", "shirt", new Color(0.32f, 0.45f, 0.68f), Rarity.Rare, pattern: "denim");
+            A(Slot.HTop, "ht_shirt_hounds", "Рубашка «гусиная лапка»", "shirt", P("white"), Rarity.Rare, P("black"), pattern: "houndstooth");
+            A(Slot.HTop, "ht_suit_black", "Чёрный костюм", "blazer", Cc2(0.08f, 0.08f, 0.09f), Rarity.Epic, Cc2(0.97f, 0.97f, 0.97f), Cc2(0.6f, 0.05f, 0.1f));
+            A(Slot.HTop, "ht_suit_beige", "Бежевый костюм", "blazer", Cc2(0.78f, 0.7f, 0.56f), Rarity.Epic, Cc2(0.97f, 0.97f, 0.97f), Cc2(0.4f, 0.25f, 0.15f));
+            A(Slot.HTop, "ht_suit_white", "Белый костюм", "blazer", Cc2(0.94f, 0.94f, 0.92f), Rarity.Legendary, Cc2(0.1f, 0.1f, 0.12f), Cc2(0.85f, 0.65f, 0.2f));
             foreach (var k in new[] { "white", "black", "red", "blue" })
                 A(Slot.HTop, "ht_tank_" + k, Adj(k, "ая майка"), "tank", P(k));
             foreach (var (k, n) in new[] { ("grey", "Серое худи"), ("black", "Чёрное худи"), ("red", "Красное худи"), ("blue", "Синее худи"), ("green", "Зелёное худи"), ("pink", "Розовое худи") })
@@ -111,6 +145,20 @@ namespace Gad
             A(Slot.HBottom, "hb_jeans_dark", "Тёмные джинсы", "pants", new Color(0.13f, 0.18f, 0.32f), Rarity.Common, pattern: "denim");
             A(Slot.HBottom, "hb_jeans_black", "Чёрные джинсы", "pants", new Color(0.12f, 0.12f, 0.13f), Rarity.Uncommon, pattern: "denim");
             A(Slot.HBottom, "hb_jeans_ripped", "Рваные джинсы", "pants", new Color(0.45f, 0.58f, 0.78f), Rarity.Rare, pattern: "ripped");
+            A(Slot.HBottom, "hb_jeans_light", "Светлые джинсы", "pants", new Color(0.62f, 0.72f, 0.86f), Rarity.Common, pattern: "denim");
+            A(Slot.HBottom, "hb_jeans_white", "Белые джинсы", "pants", new Color(0.93f, 0.93f, 0.9f), Rarity.Uncommon, pattern: "denim");
+            A(Slot.HBottom, "hb_jeans_grey", "Серые джинсы", "pants", new Color(0.42f, 0.44f, 0.48f), Rarity.Uncommon, pattern: "denim");
+            A(Slot.HBottom, "hb_jeans_ripped_black", "Чёрные рваные джинсы", "pants", new Color(0.12f, 0.12f, 0.13f), Rarity.Rare, pattern: "ripped");
+            A(Slot.HBottom, "hb_cargo_camo", "Камуфляжные карго", "cargo", new Color(0.36f, 0.4f, 0.24f), Rarity.Rare, new Color(0.55f, 0.5f, 0.32f), pattern: "camo");
+            A(Slot.HBottom, "hb_cargo_black", "Чёрные карго", "cargo", new Color(0.1f, 0.1f, 0.11f), Rarity.Uncommon);
+            A(Slot.HBottom, "hb_pants_beige", "Бежевые брюки", "pants", new Color(0.82f, 0.74f, 0.6f), Rarity.Common);
+            A(Slot.HBottom, "hb_pants_hounds", "Брюки «гусиная лапка»", "pants", new Color(0.9f, 0.9f, 0.88f), Rarity.Rare, new Color(0.1f, 0.1f, 0.12f), pattern: "houndstooth");
+            A(Slot.HBottom, "hb_shorts_camo", "Камуфляжные шорты", "shorts", new Color(0.36f, 0.4f, 0.24f), Rarity.Uncommon, new Color(0.55f, 0.5f, 0.32f), pattern: "camo");
+            A(Slot.HBottom, "hb_skirt_denim", "Джинсовая юбка", "skirt", new Color(0.32f, 0.45f, 0.68f), Rarity.Uncommon, pattern: "denim");
+            A(Slot.HBottom, "hb_skirt_white", "Белая юбка", "skirt", P("white"), Rarity.Uncommon);
+            A(Slot.HBottom, "hb_skirt_red", "Красная юбка", "skirt", P("red"), Rarity.Uncommon);
+            A(Slot.HBottom, "hb_skirt_dots", "Юбка в горошек", "skirt", P("navy"), Rarity.Rare, P("white"), pattern: "dots");
+            A(Slot.HBottom, "hb_skirt_beige", "Бежевая юбка", "skirt", new Color(0.86f, 0.78f, 0.64f), Rarity.Uncommon);
             foreach (var (k, n, c) in new[] { ("grey", "Серые спортивки", new Color(0.55f, 0.56f, 0.58f)), ("black", "Чёрные спортивки", P("black")), ("navy", "Синие спортивки", P("navy")), ("red", "Красные спортивки", P("red")), ("green", "Зелёные спортивки", new Color(0.15f, 0.45f, 0.25f)) })
                 A(Slot.HBottom, "hb_joggers_" + k, n, "joggers", c, Rarity.Uncommon, P("white"), pattern: "stripes");
             A(Slot.HBottom, "hb_cargo_khaki", "Бежевые карго", "cargo", new Color(0.7f, 0.62f, 0.45f), Rarity.Uncommon);
@@ -261,8 +309,16 @@ namespace Gad
             var ctx = new Dress { h = h, built = result, skin = skin, mannequin = mannequin };
             var hair = Wardrobe.Find(look.hHair);
             var acc = Wardrobe.Find(look.hAcc);
-            DressEyes(ctx, Wardrobe.Find(look.hEyes), hair);
-            DressMouth(ctx, Wardrobe.Find(look.hMouth), hair);
+            if (h.realHead != null)
+            {
+                RealEyes(ctx, Wardrobe.Find(look.hEyes));
+                if (!female && look.hMouth == "hm_beard") h.realHead.sharedMaterial = RealHeadMat(skin, false, true);
+            }
+            else
+            {
+                DressEyes(ctx, Wardrobe.Find(look.hEyes), hair);
+                DressMouth(ctx, Wardrobe.Find(look.hMouth), hair);
+            }
             bool hat = acc != null && !acc.none && (acc.style == "cap" || acc.style == "beanie");
             DressHair(ctx, hair, hat);
             var top = Wardrobe.Find(look.hTop);
@@ -997,6 +1053,42 @@ namespace Gad
                             c = (du < 0.03f && du > 0.012f ? accent : baseC) * (1f + n);
                             break;
                         }
+                        case "camo":
+                        {   // four-colour woodland camouflage from layered noise blobs
+                            float a1 = Mathf.PerlinNoise(x * 0.035f + 11f, y * 0.035f), a2 = Mathf.PerlinNoise(x * 0.05f + 50f, y * 0.05f + 7f), a3 = Mathf.PerlinNoise(x * 0.07f + 90f, y * 0.07f + 3f);
+                            c = baseC;
+                            if (a1 > 0.55f) c = Color.Lerp(baseC, accent, 0.6f);
+                            if (a2 > 0.62f) c = accent;
+                            if (a3 > 0.68f) c = Color.Lerp(baseC, Color.black, 0.55f);
+                            c *= 1f + n;
+                            break;
+                        }
+                        case "dots":
+                        {
+                            int cx = x % 16 - 8, cy = (y + (x / 16 % 2) * 8) % 16 - 8;
+                            c = (cx * cx + cy * cy < 13 ? accent : baseC) * (1f + n);
+                            break;
+                        }
+                        case "tiedye":
+                        {   // swirls of colour spiralling out from the chest
+                            float du = (u - 0.25f) * 2.2f, dv = (v - 0.55f) * 1.4f;
+                            float r = Mathf.Sqrt(du * du + dv * dv), ang = Mathf.Atan2(dv, du);
+                            float sw = Mathf.Sin(ang * 3f + r * 18f + Mathf.PerlinNoise(x * 0.05f, y * 0.05f) * 3f) * 0.5f + 0.5f;
+                            var third = new Color(accent.b, baseC.r, accent.g);
+                            c = sw < 0.33f ? Color.Lerp(baseC, accent, sw * 3f) : sw < 0.66f ? Color.Lerp(accent, third, (sw - 0.33f) * 3f) : Color.Lerp(third, baseC, (sw - 0.66f) * 3f);
+                            c = Color.Lerp(c, Color.white, 0.12f) * (1f + n);
+                            break;
+                        }
+                        case "ombre":
+                            c = Color.Lerp(accent, baseC, Mathf.SmoothStep(0f, 1f, v)) * (1f + n);
+                            break;
+                        case "houndstooth":
+                        {
+                            int hx = x % 12, hy = y % 12;
+                            bool on = (hx < 6) == (hy < 6) ? ((hx < 6) ^ (hx + hy) % 6 < 3) : (hx + 12 - hy) % 12 < 4;
+                            c = (on ? accent : baseC) * (1f + n);
+                            break;
+                        }
                         default:
                             c = baseC * (1f + n + ((x + (y % 2)) % 2 == 0 ? 0.015f : -0.015f));
                             break;
@@ -1100,6 +1192,15 @@ namespace Gad
                     Dot(fu - 0.025f, fv + 0.05f, 0.012f); Dot(fu + 0.025f, fv + 0.05f, 0.012f);
                     for (float tt = 3.6f; tt < 5.8f; tt += 0.04f) Dot(fu + Mathf.Cos(tt) * 0.045f, fv - 0.01f + Mathf.Sin(tt) * 0.09f, 0.007f);
                     break;
+                case "leaf":
+                    // a leaf with its vein (the Herbal logo)
+                    for (float tt = 0f; tt <= 1f; tt += 0.02f)
+                    {
+                        float w = Mathf.Sin(tt * Mathf.PI) * 0.045f;
+                        for (float k = -1f; k <= 1f; k += 0.25f) Dot(fu + k * w, fv - 0.14f + tt * 0.28f, 0.007f);
+                    }
+                    Line(fu, fv - 0.18f, fu, fv + 0.12f, 0.004f);
+                    break;
                 case "hay":
                     // "HH" in big block letters.
                     foreach (var ox in new[] { -0.045f, 0.03f })
@@ -1184,8 +1285,9 @@ namespace Gad
             var h = x.h; var s = h.shape; string g = s.female ? "f" : "m";
             string st = d.style;
             bool ornate = st == "tang" || st == "chapan" || st == "kosovorotka" || st == "dress";
-            string kind = st == "flannel" ? "check" : d.pattern == "stripes" ? "stripes" : d.pattern == "vstripes" ? "vstripes" : st == "tang" || st == "chapan" ? "ornament" : "plain";
-            string print = st == "jersey" || st == "kit" || st == "gondolier" ? null : d.pattern != "stripes" && d.pattern != "vstripes" && !ornate ? d.pattern : null;
+            bool fabric = d.pattern == "camo" || d.pattern == "dots" || d.pattern == "tiedye" || d.pattern == "ombre" || d.pattern == "houndstooth" || d.pattern == "denim";
+            string kind = st == "flannel" ? "check" : d.pattern == "stripes" ? "stripes" : d.pattern == "vstripes" ? "vstripes" : fabric ? d.pattern : st == "tang" || st == "chapan" ? "ornament" : "plain";
+            string print = st == "jersey" || st == "kit" || st == "gondolier" || fabric ? null : d.pattern != "stripes" && d.pattern != "vstripes" && !ornate ? d.pattern : null;
             var body = Cloth(kind, d.color, d.color2, print, -1, true, st == "chapan" ? 0.45f : st == "tang" || st == "dress" ? 0.4f : 0.12f);
             var plain = Cloth(kind, d.color, d.color2, null, -1, false, st == "chapan" ? 0.45f : st == "tang" || st == "dress" ? 0.4f : 0.12f);
             if (st == "blazer") { body = Cloth("plain", d.color2, d.color2); }   // the shirt under the jacket
@@ -1232,9 +1334,9 @@ namespace Gad
             {
                 foreach (var (ua, fa, side) in new[] { (h.uArmL, h.fArmL, -1f), (h.uArmR, h.fArmR, 1f) })
                 {
-                    Acc(x, "top_shoulder", Loft($"top_delt_{g}_{gr:0.000}", s.uArm, -0.06f, s.uArm.Y1, gr + 0.006f, false, true, 8), plain, h.torso, Human.Bones.ShoulderFromTorso(s, side));
+                    Acc(x, "top_shoulder", Loft($"top_delt2_{g}_{gr:0.000}", s.uArm, -0.06f, 0.048f, gr + 0.006f, false, true, 8, 32, squashBottom: -99f), plain, h.torso, Human.Bones.ShoulderFromTorso(s, side), null, new Vector3(1f, 0.72f, 1f));   // rounded: the full profile ends in a point
                     float sy = longSleeves ? s.uArm.Y0 - 0.01f : -0.14f;
-                    Acc(x, "top_sleeve", Loft($"top2_sleeve_{g}_{gr:0.000}_{longSleeves}", s.uArm, sy, 0.03f, gr, false, false, 14, 32, bump: SleeveFolds), plain, ua);
+                    Acc(x, "top_sleeve", Loft($"top3_sleeve_{g}_{gr:0.000}_{longSleeves}", s.uArm, sy, 0.048f, gr, false, true, 14, 32, bump: SleeveFolds), plain, ua);
                     if (!longSleeves)
                     {
                         var sr = new List<Vector3>();
@@ -1490,7 +1592,7 @@ namespace Gad
         {
             if (d == null || d.none) return;
             var h = x.h; var s = h.shape; string g = s.female ? "f" : "m";
-            string kind = d.pattern == "denim" ? "denim" : d.pattern == "ripped" ? "ripped" : d.pattern == "plaid" ? "check" : d.style == "joggers" ? "sidestripes" : "plain";
+            string kind = d.pattern == "denim" ? "denim" : d.pattern == "ripped" ? "ripped" : d.pattern == "plaid" ? "check" : d.pattern == "camo" || d.pattern == "houndstooth" || d.pattern == "dots" ? d.pattern : d.style == "joggers" ? "sidestripes" : "plain";
             var mat = Cloth(kind, d.color, d.color2);
             var knees = Cloth(kind, d.color, d.color2, null, -1, true);
             if (d.style == "fshorts") { d = new Wardrobe.SkinDef { style = "shorts", color = d.color, color2 = d.color2, pattern = "fshorts" }; }

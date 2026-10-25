@@ -6,7 +6,10 @@ TEX = ["asphalt_02", "checkered_pavement_tiles", "concrete_tiles_02", "grass_pat
        "rectangular_facade_tiles", "rectangular_facade_tiles_02", "oak_veneer_01", "dark_wood", "marble_01",
        "laminate_floor_02", "wood_floor", "interior_tiles", "terrazzo_tiles", "granite_tile", "grey_roof_tiles_02",
        "clay_roof_tiles_02", "gravel_concrete", "corrugated_iron", "metal_plate", "fabric_pattern_07", "leather_white",
-       "velour_velvet", "white_plaster_02", "painted_concrete", "wood_floor_deck"]
+       "velour_velvet", "white_plaster_02", "painted_concrete", "wood_floor_deck",
+       # 0.7: house walls and roofs
+       "white_bricks", "weathered_plank_siding", "black_painted_planks", "white_planks_clean", "stacked_stone_wall",
+       "white_stucco", "roof_slates_02", "red_slate_roof_tiles_01", "exterior_wall_cladding", "yellow_bricks"]
 MOD = ["sofa_02", "sofa_03", "modern_arm_chair_01", "modern_coffee_table_01", "coffee_table_round_01", "potted_plant_04",
        "Television_01", "modern_ceiling_lamp_01", "metal_office_desk", "wooden_bookshelf_worn", "side_table_01",
        "planter_box_01", "outdoor_table_chair_set_01", "CashRegister_01", "steel_frame_shelves_01", "classic_laptop",

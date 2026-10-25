@@ -84,6 +84,10 @@ namespace Gad
             Btn("ИГРАТЬ", new Color(0.15f, 0.72f, 0.32f), Play, 120, 52);
             Btn("ПЕРСОНАЖ", new Color(0.2f, 0.42f, 0.85f), () => Menus.Dress(false), 86, 34);
             Btn("НАСТРОЙКИ", new Color(0.32f, 0.36f, 0.45f), Menus.Settings, 86, 34);
+            // other games are not ready yet: the button is shown greyed out and does nothing
+            var more = Btn("ДРУГИЕ ИГРЫ · СКОРО", new Color(0.22f, 0.24f, 0.28f, 0.85f), null, 76, 28);
+            more.Interactable = false;
+            more.Label.color = new Color(1f, 1f, 1f, 0.45f);
 
             nick = UIKit.Txt(col, "", 28, Color.white, TextAlignmentOptions.BottomLeft);
             UIKit.Place(nick.rectTransform, Vector2.zero, Vector2.zero, new Vector2(0, 46), new Vector2(820, 40));
