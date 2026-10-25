@@ -458,6 +458,8 @@ namespace Gad
                     ("Морской порт", () => City.Nearest(BType.Port, Vector3.zero)),
                     ("Пляж", () => City.All.Find(x => x.name.Contains("Пляжный бар"))),
                     ("Горы (ресторан «Перевал»)", () => City.All.Find(x => x.name.Contains("Перевал"))),
+                    ("Озеро", () => City.All.Find(x => x.name.Contains("Озеро"))),
+                    ("Маяк", () => City.All.Find(x => x.name.Contains("Маяк"))),
                     ("Торговый центр", () => City.Nearest(BType.Mall, PlayerCtl.I.transform.position)),
                     ("Автосалон", () => City.Nearest(BType.CarDealer, PlayerCtl.I.transform.position)),
                     ("Мой дом", () => Save.D.homes.Count > 0 ? City.Get(Save.D.homes[0].building) : null),

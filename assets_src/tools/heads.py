@@ -229,6 +229,13 @@ for g in ("male", "female"):
     save_png(paint(pos, ao, g == "female", False), f"{OUT}/head_{k}_a.png")
     if g == "male": save_png(paint(pos, ao, False, True), f"{OUT}/head_m_s.png")
     nv, nt = export(low, E, f"{OUT}/head_{k}.bytes")
+    # a lighter copy for people in the crowd (same UVs, so the same textures fit)
+    lo = low.copy(); lo.data = low.data.copy(); sc.collection.objects.link(lo)
+    dec = lo.modifiers.new("dec", 'DECIMATE'); dec.ratio = 0.22
+    bpy.ops.object.select_all(action='DESELECT'); lo.select_set(True); bpy.context.view_layer.objects.active = lo
+    bpy.ops.object.modifier_apply(modifier="dec")
+    lv, lt = export(lo, E, f"{OUT}/head_{k}_lo.bytes")
+    print("LOD", g, lv, lt)
     zs = [(low.matrix_world @ v.co).z - E.z for v in low.data.vertices]
     xs = [abs((low.matrix_world @ v.co).x - E.x) for v in low.data.vertices]
     eyes = []

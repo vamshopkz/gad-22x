@@ -37,6 +37,18 @@ namespace Gad
         /// <summary>A drivable route from a to b: along the grid roads in the right-hand lane.</summary>
         public static List<Vector3> Route(Vector3 a, Vector3 b)
         {
+            // 0.9: out to the lake or the lighthouse: through town to the start of that road, then along its curves
+            var tail = OutRoads.TailTo(b);
+            if (tail != null && OutRoads.TailTo(a) == null)
+            {
+                var r = Route(a, tail[0]);
+                for (int i = 0; i < tail.Count; i += 2)
+                {
+                    var d = (tail[Mathf.Min(tail.Count - 1, i + 1)] - tail[Mathf.Max(0, i - 1)]).normalized;
+                    r.Add(tail[i] + new Vector3(d.z, 0, -d.x) * 2.8f + Vector3.up * 0.05f);
+                }
+                return r;
+            }
             float P = City.P;
             Vector3 Snap(Vector3 p, out Vector3 cross)
             {

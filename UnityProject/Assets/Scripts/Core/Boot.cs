@@ -38,6 +38,7 @@ namespace Gad
             DayNight.Create();
             Weather.Create();
             Reflections.Create();
+            RoomCubes.Build();
             AudioFx.Create();
             PlayerCtl.Create();
             Gfx.Init();
@@ -47,6 +48,7 @@ namespace Gad
             InPlace.Create();
             Traffic.Create();
             Guns.Create();
+            OutRoads.Traffic();
             new GameObject("Work").AddComponent<Work>();
             WorldNet.Create();
             Hud.Create();

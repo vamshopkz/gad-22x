@@ -17,6 +17,7 @@ Shader "Gad/FacadeInterior"
         _LitRate ("Lit rooms at night", Float) = 0.45
         _WallSmooth ("Wall smoothness", Float) = 0.3
         _DayRoom ("Room brightness by day", Float) = 0.42
+        _RoomKind ("Room kind 0..3", Float) = 0
     }
     SubShader
     {
@@ -45,6 +46,11 @@ Shader "Gad/FacadeInterior"
             TEXTURE2D(_MaskMap); SAMPLER(sampler_MaskMap);
             TEXTURE2D(_Rooms); SAMPLER(sampler_Rooms);
             float _GadNight;
+            TEXTURECUBE(_RoomCube0); SAMPLER(sampler_RoomCube0);
+            TEXTURECUBE(_RoomCube1);
+            TEXTURECUBE(_RoomCube2);
+            TEXTURECUBE(_RoomCube3);
+            float4 _RoomDims;   // the recorded rooms: width, height, depth (m)
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
@@ -55,6 +61,7 @@ Shader "Gad/FacadeInterior"
                 half _LitRate;
                 half _WallSmooth;
                 half _DayRoom;
+                half _RoomKind;
             CBUFFER_END
 
             struct Attributes
@@ -93,8 +100,9 @@ Shader "Gad/FacadeInterior"
 
             float Hash(float2 p) { return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
 
-            // Ray from the window into a unit room [0,1]x[0,1]x[-depth,0]; returns the room colour.
-            half3 Room(float2 f, float3 rd, float variant, float depth)
+            // 0.9: ray from the window into a unit room [0,1]x[0,1]x[-depth,0]; where it hits the room's
+            // box, look that way into a cubemap recorded from the middle of a real furnished room.
+            half3 Room(float2 f, float3 rd, float variant, float depth, float flip)
             {
                 rd.z = min(rd.z, -1e-3);
                 float tx = (rd.x > 0 ? (1 - f.x) : -f.x) / (abs(rd.x) > 1e-4 ? rd.x : 1e-4);
@@ -102,33 +110,14 @@ Shader "Gad/FacadeInterior"
                 float tz = -depth / rd.z;
                 float t = min(min(tx, ty), tz);
                 float3 h = float3(f, 0) + rd * t;
-                float col = variant * 0.25;
-                float2 auv;
-                float shade = 1;
-                if (t == tz)
-                {
-                    auv = float2(h.x, 0.5 + h.y * 0.5);                      // back wall: top half of the column
-                }
-                else if (t == tx)
-                {
-                    auv = float2(saturate(-h.z / depth), 0.25 + h.y * 0.25);  // side wall
-                    shade = 0.82;
-                }
-                else if (rd.y < 0)
-                {
-                    auv = float2(h.x, 0.125 + saturate(-h.z / depth) * 0.125); // floor
-                    shade = 0.9;
-                }
-                else
-                {
-                    auv = float2(h.x, saturate(-h.z / depth) * 0.125);          // ceiling
-                    shade = 1.05;
-                }
-                auv.x = col + saturate(auv.x) * 0.25;
-                // atlas rows run top to bottom in the image: back(0-0.5), side(0.5-0.75), floor, ceiling
-                auv.y = 1 - auv.y;
-                half3 c = SAMPLE_TEXTURE2D(_Rooms, sampler_Rooms, auv).rgb * shade;
-                return c * lerp(1.0, 0.55, saturate(-h.z / depth));            // darker deeper in
+                float3 dims = _RoomDims.x > 0 ? _RoomDims.xyz : float3(4, 3, 5);
+                float3 d = float3((h.x - 0.5) * dims.x * flip, (h.y - 0.5) * dims.y, (saturate(-h.z / depth) - 0.5) * dims.z);
+                half3 c;
+                if (variant < 0.5) c = SAMPLE_TEXTURECUBE(_RoomCube0, sampler_RoomCube0, d).rgb;
+                else if (variant < 1.5) c = SAMPLE_TEXTURECUBE(_RoomCube1, sampler_RoomCube0, d).rgb;
+                else if (variant < 2.5) c = SAMPLE_TEXTURECUBE(_RoomCube2, sampler_RoomCube0, d).rgb;
+                else c = SAMPLE_TEXTURECUBE(_RoomCube3, sampler_RoomCube0, d).rgb;
+                return c;
             }
 
             half4 frag(Varyings i) : SV_Target
@@ -152,7 +141,8 @@ Shader "Gad/FacadeInterior"
                 float2 f = frac(cuv);
                 float3 rd = float3(dot(-V, T), dot(-V, B), dot(-V, N));
                 float h1 = Hash(cell + 0.37), h2 = Hash(cell * 1.7 + 4.1);
-                half3 room = Room(f, rd, floor(h1 * 3.999), _RoomDepth);
+                // one kind of room per facade (a uniform branch: cheap), mirrored at random per window
+                half3 room = Room(f, rd, _RoomKind, _RoomDepth, frac(h1 * 7.3) > 0.5 ? 1 : -1);
                 half lit = step(1 - _LitRate, h2);
                 half night = saturate(_GadNight);
                 half bright = lerp(_DayRoom, lerp(0.06, 1.35, lit), night);
@@ -171,13 +161,13 @@ Shader "Gad/FacadeInterior"
                 SurfaceData s = (SurfaceData)0;
                 s.albedo = lerp(alb.rgb, alb.rgb * 0.04, glass);
                 s.metallic = lerp(mask.r, 0.0, glass);
-                s.smoothness = lerp(min(mask.a, 0.75) * _WallSmooth / 0.3, 0.96, glass);
+                s.smoothness = lerp(min(mask.a, 0.75) * _WallSmooth / 0.3, 0.9, glass);
                 s.normalTS = lerp(nTS, half3(0, 0, 1), glass);
                 s.occlusion = 1;
                 s.alpha = 1;
                 // glass: the room shows through (less at grazing angles where the reflection takes over)
                 half facing = saturate(dot(N, V));
-                s.emission = roomCol * glass * lerp(0.35, 1.0, facing);
+                s.emission = roomCol * glass * lerp(0.55, 1.0, facing);
                 half4 c = UniversalFragmentPBR(inputData, s);
                 c.rgb = MixFog(c.rgb, inputData.fogCoord);
                 return half4(c.rgb, 1);

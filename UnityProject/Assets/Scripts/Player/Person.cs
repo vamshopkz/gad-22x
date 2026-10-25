@@ -39,7 +39,9 @@ namespace Gad
         {
             Look = (look ?? new SkinSet()).Clone();
             if (built != null && built.root != null) Destroy(built.root);
-            built = Human.Build(Look, Height, false);
+            Human.LowDetail = !Full;   // 0.9: people in the crowd get the lighter head
+            try { built = Human.Build(Look, Height, false); }
+            finally { Human.LowDetail = false; }
             built.root.transform.SetParent(transform, false);
             built.root.transform.localPosition = Vector3.zero;
             built.root.transform.localRotation = Quaternion.identity;

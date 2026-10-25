@@ -258,6 +258,75 @@ namespace Gad
                     m.Box(Metal, Metal, new Vector3(cx - 0.2f, y0 + h, cz + 3.5f), new Vector3(cx + 0.2f, y0 + h + 14f, cz + 3.9f), new Vector2(1, 1));
                     break;
                 }
+                case BType.Mall:
+                {
+                    // 0.9: a wide, low mall: an 8 m glass front with the mall inside, light cladding above,
+                    // a big entrance canopy, coloured fins and glass roof lights
+                    Storefront(m, b, 8f, off);
+                    var clad = Photo.Mat("exterior_wall_cladding", new Color(0.95f, 0.95f, 0.97f), 0.3f);
+                    m.uvYStart = 8f;
+                    m.Box(clad, Roof, new Vector3(x0, y0 + 8f, z0), new Vector3(x1, y0 + h, z1), new Vector2(8, 8), off);
+                    m.uvYStart = 0;
+                    Parapet(m, x0, z0, x1, z1, y0 + h, Paint);
+                    Band(m, b, y0 + 9.2f, y0 + 13.2f, Mats.Lit(b.Info.Sign, 0.5f), 26f);
+                    var fd = b.FrontDir; var side = Vector3.Cross(Vector3.up, fd);
+                    var d0 = new Vector3(b.door.x, y0, b.door.z);
+                    // the entrance canopy on four columns
+                    var c0 = d0 + fd * 4.5f - side * 8f; var c1 = d0 + side * 8f;
+                    m.Box(Paint, Paint, Vector3.Min(c0, c1) + Vector3.up * 6.6f, Vector3.Max(c0, c1) + Vector3.up * 7.2f, new Vector2(4, 4), default, true);
+                    foreach (float s in new[] { -7.4f, -2.8f, 2.8f, 7.4f })
+                    {
+                        var cp = d0 + fd * 4f + side * s;
+                        m.Box(Frame, Frame, cp + new Vector3(-0.2f, 0, -0.2f), cp + new Vector3(0.2f, 6.6f, 0.2f), new Vector2(1, 1));
+                    }
+                    // coloured vertical fins along the front
+                    Vector3 ea = b.front switch { 0 => new Vector3(x0, 0, z0), 1 => new Vector3(x1, 0, z1), 2 => new Vector3(x0, 0, z1), _ => new Vector3(x1, 0, z0) };
+                    Vector3 ed = b.front switch { 0 => Vector3.right, 1 => Vector3.left, 2 => Vector3.back, _ => Vector3.forward };
+                    float len = b.front <= 1 ? x1 - x0 : z1 - z0;
+                    for (float u = 2f; u < len - 1f; u += 6f)
+                    {
+                        if (Mathf.Abs(u - len / 2f) < 9f) continue;
+                        var fpos = ea + ed * u;
+                        var col = Mats.Lit(Color.HSVToRGB((u * 0.037f) % 1f, 0.6f, 0.9f), 0.5f);
+                        var pa = fpos + fd * 0.05f + Vector3.up * (y0 + 8f) - ed * 0.15f; var pb = fpos + fd * 0.8f + Vector3.up * (y0 + h - 0.5f) + ed * 0.15f;
+                        m.Box(col, col, Vector3.Min(pa, pb), Vector3.Max(pa, pb), new Vector2(1, 1));
+                    }
+                    // glass roof lights
+                    var sky = Mats.Glass(new Color(0.6f, 0.8f, 0.9f, 0.45f));
+                    float cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+                    for (int k = -1; k <= 1; k++)
+                        m.Box(sky, sky, new Vector3(cx + k * 14f - 5f, y0 + h, cz - 9f), new Vector3(cx + k * 14f + 5f, y0 + h + 2.2f, cz + 9f), new Vector2(4, 4));
+                    break;
+                }
+                case BType.Parking:
+                {
+                    // 0.9: an open car park: four concrete decks on columns, cars on every deck, a ramp
+                    float deck = 3.1f;
+                    for (int lvl = 0; lvl < 4; lvl++)
+                    {
+                        float yy = y0 + lvl * deck;
+                        if (lvl > 0) m.Box(Concrete, Asphalt, new Vector3(x0, yy - 0.3f, z0), new Vector3(x1, yy, z1), new Vector2(4, 4), default, true, Concrete);
+                        m.Box(Concrete, Concrete, new Vector3(x0, yy, z0), new Vector3(x1, yy + 0.9f, z0 + 0.25f), new Vector2(4, 4));
+                        m.Box(Concrete, Concrete, new Vector3(x0, yy, z1 - 0.25f), new Vector3(x1, yy + 0.9f, z1), new Vector2(4, 4));
+                        m.Box(Concrete, Concrete, new Vector3(x0, yy, z0), new Vector3(x0 + 0.25f, yy + 0.9f, z1), new Vector2(4, 4));
+                        m.Box(Concrete, Concrete, new Vector3(x1 - 0.25f, yy, z0), new Vector3(x1, yy + 0.9f, z1), new Vector2(4, 4));
+                        var prng = new Rng(H.U(b.id, lvl, 55));
+                        for (float x = x0 + 2.2f; x < x1 - 2f; x += 2.7f)
+                            foreach (float zr in new[] { z0 + 3.2f, z1 - 3.2f })
+                            {
+                                if (!prng.Chance(0.65f)) continue;
+                                var def = CarDef.All[prng.I(CarDef.All.Count)];
+                                if (def.L > 5.3f) continue;
+                                m.AddMulti(CarMesh.Static(def, 1), Matrix4x4.TRS(new Vector3(x, yy + 0.02f, zr), Quaternion.Euler(0, zr < (z0 + z1) / 2 ? 0 : 180, 0), Vector3.one), CarMesh.Materials(Car.ColorOf(def, prng.I(10)), def.Spec));
+                            }
+                    }
+                    m.Box(Concrete, Asphalt, new Vector3(x0, y0 + 4 * deck - 0.3f, z0), new Vector3(x1, y0 + 4 * deck, z1), new Vector2(4, 4), default, true, Concrete);
+                    for (float x = x0 + 0.3f; x <= x1; x += 5.4f)
+                        foreach (float z in new[] { z0 + 0.3f, (z0 + z1) / 2, z1 - 0.3f })
+                            m.Box(Concrete, null, new Vector3(x - 0.25f, y0, z - 0.25f), new Vector3(x + 0.25f, y0 + 4 * deck, z + 0.25f), new Vector2(2, 2));
+                    Band(m, b, y0 + 4 * deck - 1.6f, y0 + 4 * deck - 0.4f, Mats.Lit(new Color(0.15f, 0.4f, 0.85f), 0.4f), 8f);
+                    break;
+                }
                 case BType.Factory: case BType.Warehouse:
                 {
                     m.Box(face, Roof, new Vector3(x0, y0, z0), new Vector3(x1, y0 + h, z1), new Vector2(14f, h), off);
@@ -541,7 +610,7 @@ namespace Gad
                 float h = b.height + (b.type == BType.House ? 2.3f : 0.7f);
                 if (InPlace.Eligible(b))
                 {   // 0.8: a walk-in shop: walls round the ground floor with the door free, the floors above solid
-                    var r = b.rect; float g = Mathf.Min(b.height, InPlace.Ground), y1 = City.Curb + g;
+                    var r = b.rect; float g = Mathf.Min(b.height, InPlace.GroundOf(b)), y1 = City.Curb + g;
                     if (b.height > g) Bx(bgo, new Vector3(r.xMin, y1, r.yMin), new Vector3(r.xMax, City.Curb + h, r.yMax));
                     const float t = 0.25f;
                     var d = b.door;
@@ -590,6 +659,7 @@ namespace Gad
             NorthRoad(m);
             Airport(m);
             Palms(m);
+            OutRoads.Build(m);   // 0.9: roads that bend and lead to the lake and the lighthouse
             m.Build("Outskirts", Root, 13, true);
             Mountains();
         }

@@ -146,6 +146,22 @@ namespace Gad
             Work.Cancel("Вы ушли со смены");
         }
 
+        static int viewKey = int.MinValue;
+        static Material viewMat;
+
+        /// <summary>0.9: window glass of a flat / office / lobby: the real city outside, seen from this building and floor.</summary>
+        static Material ViewGlass()
+        {
+            var b = Current;
+            if (b == null || InPlaceMode) return Mats.Glow(DayNight.IsNight ? new Color(0.08f, 0.1f, 0.2f) : new Color(0.65f, 0.82f, 0.98f));
+            int key = b.id * 1000 + Unit;
+            if (key == viewKey && viewMat != null) return viewMat;
+            float fh = HasLift(b) ? b.height / Mathf.Max(1, b.floors) : 0f;
+            var eye = new Vector3(b.rect.center.x, City.Curb + 1.6f + Unit * fh, b.rect.center.y);
+            viewKey = key;
+            return viewMat = RoomCubes.ViewFrom(eye);
+        }
+
         static void Point(Vector3 local, string label, Action act) => Points.Add(new ActionPoint { Pos = Ctr.TransformPoint(local), Label = label, Act = act });
 
         // ------------------------------------------------------------------ building blocks
@@ -176,11 +192,11 @@ namespace Gad
             var sk = Mats.Lit(wall * 0.6f);
             mb.Box(sk, sk, new Vector3(-w / 2, 0, d - 0.05f), new Vector3(w / 2, 0.12f, d), new Vector2(4, 4));
             // exit door: light rectangle with the street behind
-            if (street) mb.Box(Mats.Glow(DayNight.IsNight ? new Color(0.12f, 0.14f, 0.25f) : new Color(0.75f, 0.85f, 0.95f)), null, new Vector3(-1.4f, 0, -0.62f), new Vector3(1.4f, 2.7f, -0.6f), new Vector2(4, 4));
+            if (street) mb.Box(ViewGlass(), null, new Vector3(-1.4f, 0, -0.62f), new Vector3(1.4f, 2.7f, -0.6f), new Vector2(4, 4));
             if (!InPlaceMode) mb.Box(Mats.Lit(new Color(0.2f, 0.2f, 0.22f)), null, new Vector3(-dh - 0.1f, 2.7f, -0.05f), new Vector3(dh + 0.1f, 2.85f, 0.05f), new Vector2(4, 4));
             if (windows)
             {
-                var glow = Mats.Glow(DayNight.IsNight ? new Color(0.08f, 0.1f, 0.2f) : new Color(0.65f, 0.82f, 0.98f));
+                var glow = ViewGlass();
                 for (float z = 3; z < d - 2; z += 5)
                 {
                     mb.Box(glow, null, new Vector3(-w / 2 + 0.01f, 1f, z), new Vector3(-w / 2 + 0.02f, Mathf.Min(h - 0.6f, 2.6f), z + 2.6f), new Vector2(4, 4));
@@ -1071,7 +1087,7 @@ namespace Gad
             mb.Box(wallM, wallM, new Vector3(x0 - 0.3f, 0, czN), new Vector3(x1 + 0.3f, h, czN + 0.3f), tile);
             mb.Box(wallM, wallM, new Vector3(x0 - 0.3f, 0, cz0 - 0.3f), new Vector3(x0, h, czN), tile);
             mb.Box(wallM, wallM, new Vector3(x1, 0, cz0 - 0.3f), new Vector3(x1 + 0.3f, h, czN), tile);
-            var glow = Mats.Glow(DayNight.IsNight ? new Color(0.1f, 0.12f, 0.25f) : new Color(0.65f, 0.82f, 0.98f));
+            var glow = ViewGlass();
             mb.Box(glow, null, new Vector3(x0 + 0.01f, 0.9f, cz0 + 0.8f), new Vector3(x0 + 0.02f, 2.5f, czN - 0.8f), tile);
             mb.Box(glow, null, new Vector3(x1 - 0.02f, 0.9f, cz0 + 0.8f), new Vector3(x1 - 0.01f, 2.5f, czN - 0.8f), tile);
             var lamp = Mats.Glow(new Color(1f, 0.96f, 0.85f));
@@ -1143,7 +1159,7 @@ namespace Gad
             {
                 Room(w, d, 4.2f, Mats.Tex(Tex.Tiles("darkfloor", new Color(0.3f, 0.3f, 0.32f), new Color(0.22f, 0.22f, 0.24f), 2), Color.white, 0.6f), new Color(0.12f, 0.13f, 0.16f), false, 1.2f, false, 2);
                 // panoramic windows on three sides
-                var sky = Mats.Glow(DayNight.IsNight ? new Color(0.05f, 0.08f, 0.2f) : new Color(0.55f, 0.75f, 0.98f));
+                var sky = ViewGlass();
                 mb.Box(sky, null, new Vector3(-w / 2 + 0.01f, 0.4f, 1), new Vector3(-w / 2 + 0.02f, 3.9f, d - 1), new Vector2(4, 4));
                 mb.Box(sky, null, new Vector3(w / 2 - 0.02f, 0.4f, 1), new Vector3(w / 2 - 0.01f, 3.9f, d - 1), new Vector2(4, 4));
                 mb.Box(sky, null, new Vector3(-w / 2 + 1, 0.4f, d - 0.02f), new Vector3(w / 2 - 1, 3.9f, d - 0.01f), new Vector2(4, 4));

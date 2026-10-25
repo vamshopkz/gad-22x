@@ -50,6 +50,33 @@ namespace Gad
                     list.Add(new ParkedCar { pos = p, yaw = yaw, def = def, color = rng.I(10), chunk = (bx, bz) });
                 }
             }
+            // 0.9: car parks — two rows in front of the mall, a row behind the blocks of flats
+            foreach (var b in City.ByChunk[bx, bz])
+            {
+                var fd = b.FrontDir; var side = Vector3.Cross(Vector3.up, fd);
+                float span = b.front <= 1 ? b.rect.width : b.rect.height, depth = b.front <= 1 ? b.rect.height : b.rect.width;
+                var door = new Vector3(b.door.x, City.Curb, b.door.z);
+                void Row(Vector3 centre, float halfLen, float facing, float skip)
+                {
+                    for (float s = -halfLen; s <= halfLen; s += 2.7f)
+                    {
+                        if (Mathf.Abs(s) < skip || !rng.Chance(0.72f)) continue;
+                        int k = rng.I(100);
+                        var def = CarDef.All[k < 15 ? 0 : k < 45 ? 1 : k < 55 ? 2 : k < 70 ? 3 : k < 80 ? 4 : k < 90 ? 6 : 8];
+                        if (def.L > 5.2f) continue;
+                        var p = centre + side * s;
+                        list.Add(new ParkedCar { pos = p, yaw = facing, def = def, color = rng.I(10), chunk = (bx, bz) });
+                    }
+                }
+                float yawIn = Quaternion.LookRotation(-fd).eulerAngles.y, yawOut = Quaternion.LookRotation(fd).eulerAngles.y;
+                if (b.type == BType.Mall)
+                {
+                    Row(door + fd * 3.2f, span / 2f - 2f, yawIn, 9f);
+                    Row(door + fd * 11.6f, span / 2f - 2f, yawOut, 3f);
+                }
+                else if (b.type == BType.Apartment)
+                    Row(door - fd * (depth + 3.0f), span / 2f - 1.5f, yawOut, 0f);
+            }
             return list;
         }
 
@@ -286,6 +313,7 @@ namespace Gad
             if (d == District.Park) Park(m, rng, X0, Z0, go);
             foreach (var b in City.ByChunk[bx, bz])
             {
+                if (b.type == BType.Mall || b.type == BType.Apartment) CarPark(m, b);
                 if (HouseWorld.IsReal(b))
                 {   // 0.7: a real house (HouseWorld): just the garden here
                     if (b.type == BType.House) Garden(m, b, rng, false);
@@ -427,6 +455,40 @@ namespace Gad
                 m.Add(Prim.MeshOf(PrimitiveType.Cube), Matrix4x4.TRS(p + Vector3.up * 0.22f + rot * new Vector3(sx, 0, 0), rot, new Vector3(0.08f, 0.44f, 0.45f)), poleMat);
         }
 
+        /// <summary>0.9: asphalt and white bay lines for the car parks of the mall and behind the flats.</summary>
+        static void CarPark(MeshB m, Bld b)
+        {
+            var fd = b.FrontDir; var side = Vector3.Cross(Vector3.up, fd);
+            float span = b.front <= 1 ? b.rect.width : b.rect.height, depth = b.front <= 1 ? b.rect.height : b.rect.width;
+            var door = new Vector3(b.door.x, City.Curb + 0.02f, b.door.z);
+            var paint = WorldBuilder.Paint;
+            void Area(Vector3 c, float along, float across)
+            {
+                var a = c - side * along / 2f - fd * across / 2f; var e = c + side * along / 2f + fd * across / 2f;
+                m.Flat(WorldBuilder.Asphalt, Mathf.Min(a.x, e.x), Mathf.Min(a.z, e.z), Mathf.Max(a.x, e.x), Mathf.Max(a.z, e.z), c.y, 6f);
+            }
+            void Lines(Vector3 c, float halfLen, float len)
+            {
+                for (float s = -halfLen - 1.35f; s <= halfLen + 1.4f; s += 2.7f)
+                {
+                    var p0 = c + side * s - fd * len / 2f + Vector3.up * 0.01f; var p1 = c + side * s + fd * len / 2f + Vector3.up * 0.01f;
+                    var lo = Vector3.Min(p0, p1) - new Vector3(0.05f, 0, 0.05f); var hi = Vector3.Max(p0, p1) + new Vector3(0.05f, 0.005f, 0.05f);
+                    m.Box(paint, paint, lo, hi, new Vector2(1, 1));
+                }
+            }
+            if (b.type == BType.Mall)
+            {
+                Area(door + fd * 7.4f, span, 15f);
+                Lines(door + fd * 3.2f, span / 2f - 2f, 4.8f);
+                Lines(door + fd * 11.6f, span / 2f - 2f, 4.8f);
+            }
+            else
+            {
+                Area(door - fd * (depth + 3.0f), span, 5.6f);
+                Lines(door - fd * (depth + 3.0f), span / 2f - 1.5f, 4.8f);
+            }
+        }
+
         static void Garden(MeshB m, Bld b, Rng r, bool villa)
         {
             var lotMin = new Vector2(b.rect.xMin - 3, b.front == 0 ? b.rect.yMin - (villa ? 9 : 5) : b.rect.yMin - 4);
@@ -435,9 +497,13 @@ namespace Gad
             var dd = b.door;
             float pz0 = b.front == 0 ? dd.z - (villa ? 12 : 6) : dd.z, pz1 = b.front == 0 ? dd.z : dd.z + (villa ? 12 : 6);
             m.Flat(WorldBuilder.Plaza, dd.x - 1.2f, pz0, dd.x + 1.2f, pz1, y + 0.01f, 2f);
-            // hedge along the side
-            M(m, PrimitiveType.Cube, new Vector3(b.rect.xMin - 2.5f, y + 0.6f, b.rect.center.y), new Vector3(0.8f, 1.2f, b.rect.height + 4), hedge);
-            M(m, PrimitiveType.Cube, new Vector3(b.rect.xMax + 2.5f, y + 0.6f, b.rect.center.y), new Vector3(0.8f, 1.2f, b.rect.height + 4), hedge);
+            // hedge along the side (not where the house has its garage)
+            bool garage = !villa && HouseDesign.ForCity(b).garage;
+            if (!garage)
+            {
+                M(m, PrimitiveType.Cube, new Vector3(b.rect.xMin - 2.5f, y + 0.6f, b.rect.center.y), new Vector3(0.8f, 1.2f, b.rect.height + 4), hedge);
+                M(m, PrimitiveType.Cube, new Vector3(b.rect.xMax + 2.5f, y + 0.6f, b.rect.center.y), new Vector3(0.8f, 1.2f, b.rect.height + 4), hedge);
+            }
             if (villa)
             {
                 // pool and loungers beside the villa

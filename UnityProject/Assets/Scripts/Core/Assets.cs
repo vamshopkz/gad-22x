@@ -50,7 +50,8 @@ namespace Gad
                     m.SetFloat("_BumpScale", 1f);
                     m.SetFloat("_LitRate", style == 5 ? 0.25f : style == 4 ? 0.9f : 0.45f);
                     m.SetFloat("_RoomDepth", style == 4 ? 0.9f : style == 0 || style == 7 ? 1.4f : 1.1f);
-                    m.SetFloat("_DayRoom", style == 0 || style == 7 ? 0.12f : style == 4 ? 0.6f : 0.38f);
+                    m.SetFloat("_RoomKind", style == 3 || style == 0 || style == 7 ? 2 : style == 4 ? 3 : style % 2);   // offices in glass towers, homes elsewhere
+                    m.SetFloat("_DayRoom", style == 0 || style == 7 ? 0.42f : style == 4 ? 0.85f : 0.8f);   // 0.9: real rooms, bright enough to see by day
                     mats[key] = m;
                     return m;
                 }

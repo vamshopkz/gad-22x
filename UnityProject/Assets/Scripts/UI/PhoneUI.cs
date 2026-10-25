@@ -246,7 +246,9 @@ namespace Gad
             {
                 wv = new GameObject("WebView").AddComponent<WebViewObject>();
                 wv.transform.SetParent(transform, false);
-                wv.Init(ld: _ => { if (note != null) note.text = ""; }, transparent: false, zoom: true);
+                wv.Init(ld: _ => { if (note != null) note.text = ""; }, hooked: OpenInStore, transparent: false, zoom: true);
+                // an app's page in Google Play opens in the real Play Store app: "Install" works there without signing in again
+                wv.SetURLPattern("", "", "^https?://play\\.google\\.com/store/apps/details|^market://|^intent://");
             }
             Place();
             wv.LoadURL(url);
@@ -255,6 +257,16 @@ namespace Gad
             note.text = "";
             SearchPage(title, searchBase);
 #endif
+        }
+
+        /// <summary>Open an app's page in the phone's own Play Store (or a link the web view cannot handle).</summary>
+        static void OpenInStore(string url)
+        {
+            string id = null;
+            int k = url.IndexOf("id=");
+            if (k >= 0) { id = url.Substring(k + 3); int amp = id.IndexOf('&'); if (amp >= 0) id = id.Substring(0, amp); }
+            if (id != null && url.Contains("play.google.com")) Application.OpenURL("market://details?id=" + id);
+            else Application.OpenURL(url);
         }
 
         void Back()

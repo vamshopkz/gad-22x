@@ -240,6 +240,8 @@ public static class ProjectSetup
         Save(m, "LitNormalEmissive");
         var fis = Shader.Find("Gad/FacadeInterior");
         if (fis != null) Save(new Material(fis), "FacadeInterior"); else Debug.LogError("[Setup] FacadeInterior shader missing");
+        var wvs = Shader.Find("Gad/WindowView");
+        if (wvs != null) Save(new Material(wvs), "WindowView"); else Debug.LogError("[Setup] WindowView shader missing");
         var pano = Shader.Find("Skybox/Panoramic");
         if (pano != null) Save(new Material(pano), "SkyPano");
 

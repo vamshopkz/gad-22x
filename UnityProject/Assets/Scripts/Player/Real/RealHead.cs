@@ -13,6 +13,8 @@ namespace Gad
     {
         const float RealTopM = 0.1107f, RealTopF = 0.1069f, RealEyeX = 0.0329f, RealEyeR = 0.012f;
         static readonly Dictionary<string, Mesh> realMeshes = new Dictionary<string, Mesh>();
+        /// <summary>0.9: set while building a crowd person: the head with a fifth of the triangles.</summary>
+        public static bool LowDetail;
         static readonly Dictionary<string, Texture2D> realTex = new Dictionary<string, Texture2D>();
 
         static Texture2D RealTex(string name)
@@ -24,11 +26,12 @@ namespace Gad
         public static bool RealHeadAvailable(bool female) => RealTex(female ? "head_f_a" : "head_m_a") != null;
 
         /// <summary>The head mesh for a gender and face shape (shapes widen/narrow the jaw and cheeks, lengthen the face).</summary>
-        static Mesh RealMesh(bool female, int face)
+        static Mesh RealMesh(bool female, int face, bool lo = false)
         {
-            string key = (female ? "f" : "m") + face;
+            string key = (female ? "f" : "m") + face + (lo ? "lo" : "");
             if (realMeshes.TryGetValue(key, out var m)) return m;
-            var src = Resources.Load<TextAsset>("Heads/head_" + (female ? "f" : "m"));
+            var src = Resources.Load<TextAsset>("Heads/head_" + (female ? "f" : "m") + (lo ? "_lo" : ""));
+            if (src == null && lo) return RealMesh(female, face, false);
             if (src == null) return null;
             var b = src.bytes;
             int nv = System.BitConverter.ToInt32(b, 0), nt = System.BitConverter.ToInt32(b, 4), o = 8;
@@ -68,7 +71,7 @@ namespace Gad
         static bool BuildRealHead(HumanRig h, Color skin)
         {
             var s = h.shape;
-            var mesh = RealMesh(s.female, s.face);
+            var mesh = RealMesh(s.female, s.face, LowDetail);
             if (mesh == null) return false;
             float hs = s.headSize, k = 1.06f * hs;
             float top = s.female ? RealTopF : RealTopM;

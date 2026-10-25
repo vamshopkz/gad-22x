@@ -13,7 +13,8 @@ namespace Gad
     {
         public static InPlace I;
         const float Near = 42f, Far = 60f;
-        public const float Ground = 4.4f;     // height of the glazed ground floor
+        public const float Ground = 4.4f;     // height of the glazed ground floor (the mall: 8 m)
+        public static float GroundOf(Bld b) => b.type == BType.Mall ? 8f : Ground;
 
         class Inst { public Bld b; public GameObject root; public List<ActionPoint> points; }
         readonly Dictionary<int, Inst> built = new Dictionary<int, Inst>();
@@ -25,6 +26,7 @@ namespace Gad
         static Vector2 RoomSize(Bld b) => b.type switch
         {
             BType.Shop => new Vector2(14, 12),
+            BType.Mall => new Vector2(40, 32),
             BType.Supermarket => new Vector2(26, 22),
             BType.Cafe => new Vector2(14, 12),
             BType.Restaurant => new Vector2(20, 16),
@@ -96,7 +98,7 @@ namespace Gad
         static bool Inside(Bld b, Vector3 p)
         {
             var r = b.rect;
-            return p.x > r.xMin + 0.2f && p.x < r.xMax - 0.2f && p.z > r.yMin + 0.2f && p.z < r.yMax - 0.2f && p.y < City.Curb + Ground;
+            return p.x > r.xMin + 0.2f && p.x < r.xMax - 0.2f && p.z > r.yMin + 0.2f && p.z < r.yMax - 0.2f && p.y < City.Curb + GroundOf(b);
         }
 
         Inst Build(Bld b)
@@ -154,7 +156,7 @@ namespace Gad
             for (float t = 0.6f; t <= d; t += 0.1f)
             {
                 var c = target + back * t;
-                if (c.x < r.xMin + 0.5f || c.x > r.xMax - 0.5f || c.z < r.yMin + 0.5f || c.z > r.yMax - 0.5f || c.y > City.Curb + Ground - 0.4f) break;
+                if (c.x < r.xMin + 0.5f || c.x > r.xMax - 0.5f || c.z < r.yMin + 0.5f || c.z > r.yMax - 0.5f || c.y > City.Curb + GroundOf(I.current.b) - 0.4f) break;
                 lo = t;
             }
             return lo;

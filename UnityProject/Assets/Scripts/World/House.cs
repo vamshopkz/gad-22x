@@ -53,6 +53,7 @@ namespace Gad
         {
             bool villa = b.type == BType.Villa;
             var d = Make(1000 + b.id, b.front <= 1 ? b.rect.width : b.rect.height, b.front <= 1 ? b.rect.height : b.rect.width, false, villa ? (H.R(2, b.id, 5) == 0 ? 1 : 3) : -1);
+            if (villa || b.district != District.Suburb) d.garage = false;
             if (villa) { d.floors = 2; d.terrace = false; }   // the garden already has a pool deck behind villas
             d.name = b.name;
             return d;
@@ -126,6 +127,8 @@ namespace Gad
                     break;
             }
             if (!catalogue) { d.garage = false; d.pool = false; }
+            // 0.9: suburban houses with room beside them get their own garage
+            if (!catalogue && maxW <= 10.8f && seed % 10 < 7) d.garage = true;
             if (d.porch && d.balcony) d.porch = false;
             d.family = Families[d.fam];
             var list = Names[d.fam];

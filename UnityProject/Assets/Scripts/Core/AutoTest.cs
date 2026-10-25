@@ -44,6 +44,17 @@ namespace Gad
             if (shop) foreach (var r in shop.GetComponentsInChildren<Renderer>()) Debug.Log($"[ShopLook] renderer {r.name} bounds {r.bounds.center} {r.bounds.size} enabled={r.enabled} layer={r.gameObject.layer}");
             Debug.Log($"[ShopLook] cam={pl.Cam.transform.position} fwd={pl.Cam.transform.forward} yaw={pl.Yaw} pitch={pl.Pitch} dist={pl.Dist}");
             yield return Shot("s1_player_view");
+            {   // dump the city view cube from the middle of the nearest block of flats, 5th floor
+                var fl = City.Nearest(BType.Apartment, City.Spawn);
+                RoomCubes.ViewFrom(new Vector3(fl.rect.center.x, City.Curb + 1.6f + 4 * 3.3f, fl.rect.center.y));
+                var cube = RoomCubes.ViewCube;
+                foreach (CubemapFace face in new[] { CubemapFace.PositiveX, CubemapFace.NegativeX, CubemapFace.PositiveZ, CubemapFace.NegativeZ, CubemapFace.PositiveY, CubemapFace.NegativeY })
+                {
+                    var tx = new Texture2D(cube.width, cube.width, TextureFormat.RGBA32, false);
+                    tx.SetPixels(cube.GetPixels(face)); tx.Apply();
+                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, "cube_" + face + ".png"), tx.EncodeToPNG());
+                }
+            }
             pl.MoveInput = new Vector2(0, 1); yield return Wait(1.0f); pl.MoveInput = Vector2.zero; yield return Wait(0.5f);
             Debug.Log($"[ShopLook] after walk player={pl.transform.position} cam={pl.Cam.transform.position}");
             yield return Shot("s1b_player_view_further");
@@ -155,6 +166,42 @@ namespace Gad
                     Interiors.Exit(); yield return Wait(0.3f);
                     Check("вышел из кафе", pl.Inside < 0);
                 }
+            }
+
+            // 0.9: the mall, car parks, supermarkets that fit, roads out of town, the view from a flat
+            {
+                var mall = City.Nearest(BType.Mall, pl.transform.position);
+                Check("ТЦ: широкий, заходишь пешком", InPlace.Eligible(mall) && mall.height < 20f);
+                int sms = City.All.FindAll(x => x.type == BType.Supermarket).Count, smOk = City.All.FindAll(x => x.type == BType.Supermarket && InPlace.Eligible(x)).Count;
+                Check("супермаркеты помещаются в здание", smOk == sms, smOk + "/" + sms);
+                Check("дороги за город", OutRoads.All.Count == 2);
+                pl.Teleport(mall.door + mall.FrontDir * 20f, 0); yield return Wait(2.5f);
+                PlayerCtl.ShotCam = true;
+                var side = Vector3.Cross(Vector3.up, mall.FrontDir);
+                PlayerCtl.ShotPos = mall.door + mall.FrontDir * 38f + side * 22f + Vector3.up * 14f; PlayerCtl.ShotLook = mall.door + Vector3.up * 5f;
+                yield return Wait(1.0f); yield return Shot("80_mall");
+                var park = City.Nearest(BType.Parking, pl.transform.position);
+                pl.Teleport(park.door + park.FrontDir * 10f, 0); yield return Wait(2f);
+                PlayerCtl.ShotPos = park.door + park.FrontDir * 22f + Vector3.Cross(Vector3.up, park.FrontDir) * 14f + Vector3.up * 8f; PlayerCtl.ShotLook = new Vector3(park.rect.center.x, 5f, park.rect.center.y);
+                yield return Wait(1.0f); yield return Shot("81_car_park");
+                foreach (var (r, nm) in new[] { (OutRoads.All[0], "82_lake_road"), (OutRoads.All[1], "83_lighthouse_road") })
+                {
+                    var mid = r.pts[r.pts.Count * 2 / 3];
+                    pl.Teleport(mid + Vector3.up * 0.5f, 0); yield return Wait(1.5f);
+                    PlayerCtl.ShotPos = mid + new Vector3(30f, 28f, -40f); PlayerCtl.ShotLook = r.end;
+                    yield return Wait(0.8f); yield return Shot(nm);
+                }
+                PlayerCtl.ShotCam = false;
+                // the view out of a flat's window: the corridor on floor 5 of a block of flats
+                var flats = City.Nearest(BType.Apartment, City.Spawn);
+                pl.Teleport(flats.door + flats.FrontDir * 1.5f, 0); yield return Wait(0.5f);
+                Interiors.Enter(flats, 0); yield return Wait(0.5f);
+                Interiors.BuildLevel(4);
+                pl.Teleport(Interiors.O + new Vector3(Interiors.EX - 14f, 4 * Elevator.FH + 0.1f, Interiors.EZ - 2f), 270);
+                pl.Yaw = 270; pl.Pitch = 5; pl.Dist = 3f;
+                yield return Wait(1.0f); yield return Shot("84_view_from_flat");
+                Interiors.Exit(); yield return null;
+                pl.Dist = 5.2f;
             }
 
             // 0.8: gun shop, office towers with your own computer

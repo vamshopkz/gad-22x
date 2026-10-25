@@ -236,7 +236,8 @@ namespace Gad
                         fp = Shrink(lot, front, 2f, 12f, new Vector2(r.F(14, 17), r.F(14, 20)));
                         h = 6.8f; style = 6; break;
                     case BType.Mall:
-                        fp = Shrink(lot, front, 4, 2f, new Vector2(52, 44)); h = 16f; style = 4; break;
+                        // 0.9: a wide low mall with a car park in front of it
+                        fp = Shrink(lot, front, 2, 17f, new Vector2(54, 36)); h = 15f; style = 4; break;
                     case BType.Hospital:
                         fp = Shrink(lot, front, 4, 4f, new Vector2(46, 30)); h = 23.1f; style = 3; break;
                     case BType.University:
@@ -255,7 +256,7 @@ namespace Gad
                     case BType.Garage:
                         fp = Shrink(lot, front, 2, 3f, new Vector2(r.F(16, 22), r.F(12, 16))); h = 6f; style = 5; break;
                     case BType.Parking:
-                        fp = Shrink(lot, front, 2, 2f, new Vector2(20, 18)); h = 4.4f; style = 3; break;
+                        fp = Shrink(lot, front, 2, 2f, new Vector2(22, 20)); h = 12.4f; style = 3; break;   // 0.9: an open multi-storey car park
                     case BType.Hotel:
                         fp = Shrink(lot, front, set, 1.5f, new Vector2(r.F(20, 26), r.F(16, 22))); h = 3.3f * (6 + r.I(10)); style = r.Chance(0.5f) ? 8 : 3; break;
                     case BType.Bank: case BType.JobCenter: case BType.Library: case BType.School: case BType.FireStation:
@@ -264,6 +265,8 @@ namespace Gad
                     default:
                         bool small = t == BType.Cafe || t == BType.Shop;
                         fp = Shrink(lot, front, set, 1f, small ? new Vector2(r.F(14, 20), r.F(12, 16)) : new Vector2(r.F(20, 26), r.F(16, 22)));
+                        // 0.9: the supermarket gets the whole lot so its hall fits inside the building
+                        if (t == BType.Supermarket) fp = Shrink(lot, front, 0.3f, 1f, new Vector2(27.4f, 23.4f));
                         h = d == District.Beach ? 4.4f : 3.3f * (1 + r.I(4)) + 4.4f; style = 4; break;
                 }
                 int floors = Mathf.Max(1, Mathf.RoundToInt(h / 3.3f));
@@ -343,6 +346,11 @@ namespace Gad
             // Beach hotel and lifeguard café on the sand.
             Add(-1, -1, BType.Cafe, District.Outskirts, new Rect(9 * P, -70, 12, 8), 1, 4.4f, 1, 6, r);
             All[All.Count - 1].name = "Пляжный бар «Волна»";
+            // 0.9: cafés at the ends of the new roads: by the lake and by the lighthouse
+            Add(-1, -1, BType.Cafe, District.Outskirts, new Rect(-640, 476, 12, 9), 2, 4.4f, 1, 6, r);
+            All[All.Count - 1].name = "Кафе «Озеро»";
+            Add(-1, -1, BType.Cafe, District.Outskirts, new Rect(Size + 645, -118, 12, 9), 2, 4.4f, 1, 6, r);
+            All[All.Count - 1].name = "Кафе «Маяк»";
         }
 
         public static Bld Get(int id) => id >= 0 && id < All.Count ? All[id] : null;
