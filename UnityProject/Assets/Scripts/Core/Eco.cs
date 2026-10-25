@@ -47,6 +47,7 @@ namespace Gad
                 Interiors.BuildLevel(Interiors.Floor);
                 pl.Teleport(pos, yaw);
             }
+            else if (unit == 0 && HouseWorld.IsReal(b)) HouseWorld.Refresh(b);
             else if (unit == 0) Interiors.Enter(b, 0);
         }
 

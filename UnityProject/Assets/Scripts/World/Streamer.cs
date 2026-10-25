@@ -286,6 +286,12 @@ namespace Gad
             if (d == District.Park) Park(m, rng, X0, Z0, go);
             foreach (var b in City.ByChunk[bx, bz])
             {
+                if (HouseWorld.IsReal(b))
+                {   // 0.7: a real house (HouseWorld): just the garden here
+                    if (b.type == BType.House) Garden(m, b, rng, false);
+                    else if (b.type == BType.Villa) Garden(m, b, rng, true);
+                    continue;
+                }
                 Sign(go.transform, b);
                 AutoDoor.Make(go.transform, b);
                 BuildingDetail.Add(m, b, new Rng(H.U(b.id, 991)));

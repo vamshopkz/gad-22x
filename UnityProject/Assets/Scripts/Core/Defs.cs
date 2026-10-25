@@ -7,7 +7,7 @@ namespace Gad
     {
         Apartment, House, Villa, Tower, Office, Shop, Supermarket, Mall, CarDealer, Garage, Restaurant, Cafe, Hotel,
         Hospital, FireStation, School, University, Library, Factory, Warehouse, Bank, JobCenter, GasStation, Parking,
-        Airport, Station, Port, Clothes, Furniture, Gym, Agency
+        Airport, Station, Port, Clothes, Furniture, Gym, Agency, Plot
     }
 
     public enum District { Downtown, Business, Residential, Suburb, Beach, Industrial, Park, Outskirts }
@@ -24,6 +24,7 @@ namespace Gad
         public static readonly Dictionary<BType, BInfo> All = new Dictionary<BType, BInfo>
         {
             [BType.Apartment] = new BInfo { Title = "Жилой дом", Names = new[] { "ЖК «Северный»", "ЖК «Парковый»", "ЖК «Солнечный»", "ЖК «Новый квартал»", "ЖК «Звёздный»", "ЖК «Акация»" }, HomePrice = 35000, Sign = new Color(0.3f, 0.6f, 0.35f) },
+            [BType.Plot] = new BInfo { Title = "Участок под дом", Names = new[] { "Участок" }, Sign = new Color(0.2f, 0.7f, 0.3f) },
             [BType.House] = new BInfo { Title = "Частный дом", Names = new[] { "Дом" }, HomePrice = 90000, Sign = new Color(0.55f, 0.4f, 0.25f) },
             [BType.Villa] = new BInfo { Title = "Вилла", Names = new[] { "Вилла «Бриз»", "Вилла «Лагуна»", "Вилла «Ривьера»", "Вилла «Палм»" }, HomePrice = 420000, Sign = new Color(0.85f, 0.65f, 0.2f) },
             [BType.Tower] = new BInfo { Title = "Небоскрёб", Names = new[] { "X-Tower", "Сити Плаза", "Гранд Тауэр", "Неон Сити", "Скай Хаб" }, HomePrice = 650000, BizPrice = 900000, Sign = new Color(0.2f, 0.75f, 1f) },

@@ -176,6 +176,7 @@ namespace Gad
 
         public static void Shell(MeshB m, Bld b)
         {
+            if (HouseWorld.IsReal(b)) return;   // 0.7: houses, villas and plots are built by HouseWorld (with real interiors)
             float x0 = b.rect.xMin, z0 = b.rect.yMin, x1 = b.rect.xMax, z1 = b.rect.yMax, y0 = City.Curb, h = b.height;
             var off = new Vector2(H.R(4, b.id) * 0.25f, H.R(4, b.id, 1) * 0.25f);
             var face = Facade[b.style];
@@ -483,6 +484,7 @@ namespace Gad
                 }
             foreach (var b in City.All)
             {
+                if (HouseWorld.IsReal(b)) continue;   // their own colliders come with the close-up house
                 float h = b.height + (b.type == BType.House ? 2.3f : 0.7f);
                 Bx(bgo, new Vector3(b.rect.xMin, 0, b.rect.yMin), new Vector3(b.rect.xMax, City.Curb + h, b.rect.yMax));
                 if (b.type == BType.GasStation)

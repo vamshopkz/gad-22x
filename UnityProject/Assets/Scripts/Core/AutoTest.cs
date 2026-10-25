@@ -60,7 +60,8 @@ namespace Gad
             Check("город построен", City.All.Count > 300, City.All.Count + " зданий");
             Check("детали подгружены", Streamer.LoadedCount > 5, Streamer.LoadedCount + " кварталов");
 
-            // walking
+            // walking (along the sidewalk: the block's buildings start 2 m to the side)
+            pl.Yaw = 0;
             var p0 = pl.transform.position;
             pl.MoveInput = new Vector2(0, 1);
             yield return Wait(1.5f);
@@ -75,7 +76,7 @@ namespace Gad
             pl.Dist = 5.2f;
 
             // every kind of building can be entered
-            var types = new[] { BType.Supermarket, BType.Restaurant, BType.Cafe, BType.CarDealer, BType.Garage, BType.Mall, BType.Hospital, BType.Office, BType.School, BType.Apartment, BType.Factory, BType.Bank, BType.Hotel, BType.Parking, BType.Airport, BType.Library, BType.FireStation, BType.Gym, BType.Warehouse, BType.Villa, BType.Tower, BType.Station, BType.Port, BType.JobCenter, BType.Clothes, BType.Furniture, BType.GasStation, BType.House, BType.University, BType.Shop };
+            var types = new[] { BType.Supermarket, BType.Restaurant, BType.Cafe, BType.CarDealer, BType.Garage, BType.Mall, BType.Hospital, BType.Office, BType.School, BType.Apartment, BType.Factory, BType.Bank, BType.Hotel, BType.Parking, BType.Airport, BType.Library, BType.FireStation, BType.Gym, BType.Warehouse, BType.Tower, BType.Station, BType.Port, BType.JobCenter, BType.Clothes, BType.Furniture, BType.GasStation, BType.University, BType.Shop };
             int n = 0;
             foreach (var t in types)
             {
@@ -95,6 +96,49 @@ namespace Gad
                 Interiors.Exit();
                 yield return null;
                 n++;
+            }
+
+            // 0.7: real houses — walk in through the front door, no separate interior
+            {
+                int plots = City.All.FindAll(x => x.type == BType.Plot).Count;
+                Check("участки под свои дома", plots >= 15, plots + " участков");
+                var names = new HashSet<string>();
+                for (int i = 0; i < HouseDesign.Count; i++) names.Add(HouseDesign.Get(i).name);
+                Check("100 проектов домов", names.Count >= 95, names.Count + " разных");
+                var hb2 = City.Nearest(BType.House, City.Spawn);
+                var dirIn = -hb2.FrontDir;
+                float yawIn = Mathf.Atan2(dirIn.x, dirIn.z) * Mathf.Rad2Deg;
+                pl.Teleport(hb2.door - dirIn * 5f + Vector3.up * 0.2f, yawIn);
+                pl.Pitch = 12; pl.Dist = 4.5f;
+                yield return Wait(1.2f);
+                Check("дом построен рядом с игроком", HouseWorld.InsideOf(hb2) != null);
+                yield return Shot("70_real_house_out");
+                pl.MoveInput = new Vector2(0, 1);
+                float tw = 0;
+                while (tw < 3.2f) { tw += Time.deltaTime; yield return null; }
+                pl.MoveInput = Vector2.zero;
+                yield return Wait(0.6f);
+                var pp = pl.transform.position;
+                bool inside = hb2.rect.Contains(new Vector2(pp.x, pp.z)) && pl.Inside < 0;
+                Check("зашёл в дом прямо через дверь", inside, $"{pp.x:0.0},{pp.z:0.0}");
+                yield return Shot("71_real_house_in");
+                pl.Yaw = yawIn + 180; yield return Wait(0.4f);
+                yield return Shot("71_real_house_in_back");
+                // build a house on a plot
+                var plot = City.Nearest(BType.Plot, City.Spawn);
+                Save.D.plots.RemoveAll(x => x.building == plot.id);
+                Save.D.plots.Add(new PlotHouse { building = plot.id, design = 13 });
+                HouseWorld.Refresh(plot);
+                var pdir = -plot.FrontDir;
+                pl.Teleport(plot.door - pdir * 6f + Vector3.up * 0.2f, Mathf.Atan2(pdir.x, pdir.z) * Mathf.Rad2Deg);
+                pl.Pitch = 16; pl.Dist = 9f;
+                yield return Wait(1.2f);
+                Check("свой дом на участке", HouseWorld.InsideOf(plot) != null);
+                yield return Shot("72_plot_house");
+                HouseMenus.Plot(plot); yield return Wait(6f); yield return Shot("73_house_catalogue"); Window.Close();
+                Save.D.plots.RemoveAll(x => x.building == plot.id);
+                HouseWorld.Refresh(plot);
+                pl.Dist = 5.2f;
             }
 
             // walk into a shop through its automatic doors, then walk out
@@ -209,7 +253,9 @@ namespace Gad
             yield return Wait(0.3f);
             Save.D.cars.Add(new OwnedCar { model = "sport", color = 0 });
             Interiors.Exit();
-            var car = pl.CallCar(Save.D.cars.Count - 1, pl.transform.position);
+            // on the empty road to the mountains, so traffic stopped at a light cannot block the test
+            var car = Car.Spawn(CarDef.Get("sport"), 0, new Vector3(City.NorthRoadX + 2.5f, 0.3f, City.Size + 40f), 0f, false, Save.D.cars.Count - 1);
+            pl.Teleport(new Vector3(City.NorthRoadX + 5f, 0.3f, City.Size + 40f), 0f);
             Check("машина вызвана", car != null);
             yield return Wait(0.3f);
             if (car != null)
@@ -224,7 +270,9 @@ namespace Gad
                 yield return Wait(1.5f);
                 pl.MoveInput = Vector2.zero;
                 pl.BrakeHeld = true;
-                yield return Wait(2f);
+                float tb = Time.realtimeSinceStartup;
+                while (Mathf.Abs(car.Speed) > 0.5f && Time.realtimeSinceStartup - tb < 8f) yield return null;
+                yield return Wait(0.3f);
                 pl.BrakeHeld = false;
                 pl.ExitCar();
                 yield return Wait(1.6f);

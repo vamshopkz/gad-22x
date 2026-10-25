@@ -178,6 +178,9 @@ namespace Gad
                 if (ap != null) { ActionLabel = ap.Label; ActionDo = ap.Act; }
                 return;
             }
+            // 0.7: actions out in the world (real houses, plots)
+            var wp = WorldActions.Nearest(p, 2.2f);
+            if (wp != null) { ActionLabel = wp.Label; ActionDo = wp.Act; }
             // any car nearby can be taken: yours, parked, or one stopped in traffic
             float nd = 3.2f;
             foreach (var c in Car.Live)

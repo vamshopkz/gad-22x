@@ -47,6 +47,14 @@ namespace Gad
         public List<string> decor = new List<string>(); // "slot:style"
     }
 
+    /// <summary>0.7: a house the player built on a plot (catalogue design id).</summary>
+    [Serializable]
+    public class PlotHouse
+    {
+        public int building;
+        public int design;
+    }
+
     [Serializable]
     public class OwnedBiz
     {
@@ -75,6 +83,7 @@ namespace Gad
         public List<OwnedCar> cars = new List<OwnedCar>();
         public List<OwnedHome> homes = new List<OwnedHome>();
         public List<OwnedBiz> biz = new List<OwnedBiz>();
+        public List<PlotHouse> plots = new List<PlotHouse>();
         public List<string> wardrobe = new List<string>();
         public float px = 0, py = 0, pz = 0, pyaw = 0;
         public bool created;

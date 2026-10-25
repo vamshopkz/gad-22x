@@ -262,9 +262,18 @@ namespace Gad
                         h = d == District.Beach ? 4.4f : 3.3f * (1 + r.I(4)) + 4.4f; style = 4; break;
                 }
                 int floors = Mathf.Max(1, Mathf.RoundToInt(h / 3.3f));
+                // 0.7: building plots in the suburbs (18 of them) where players build their own houses
+                if (d == District.Suburb && IsPlot(bx, bz, li) && !(hasFixed && li == 0))
+                {
+                    t = BType.Plot; h = 0.5f; floors = 0;
+                    fp = new Rect(lot.xMin + 0.3f, lot.yMin + 0.3f, lot.width - 0.6f, lot.height - 0.6f);
+                }
                 Add(bx, bz, t, d, fp, front, h, floors, style, r);
             }
         }
+
+        static bool IsPlot(int bx, int bz, int li) =>
+            (bz == N - 2 && bx >= 3 && bx <= 11 && bx != 7 && (li == 1 || li == 4)) || (bz == N - 1 && (bx == 4 || bx == 10) && li == 2);
 
         /// <summary>Footprint of a given size inside the lot, pushed towards its front edge.</summary>
         static Rect Shrink(Rect lot, int front, float side, float frontGap, Vector2 size)
@@ -300,6 +309,7 @@ namespace Gad
         {
             var info = b.Info;
             if (b.type == BType.House) b.name = "Дом " + (b.id % 97 + 1);
+            else if (b.type == BType.Plot) b.name = "Участок №" + (b.id % 89 + 1);
             else if (b.type == BType.Agency) b.name = "Herbal City · Недвижимость";
             else b.name = H.Pick(info.Names, b.id, 77);
             if (b.cx >= 0)

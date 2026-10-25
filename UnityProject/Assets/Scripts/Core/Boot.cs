@@ -43,6 +43,7 @@ namespace Gad
             Gfx.Init();
             PostFx.Create();
             Streamer.Create();
+            HouseWorld.Create();
             Traffic.Create();
             new GameObject("Work").AddComponent<Work>();
             WorldNet.Create();

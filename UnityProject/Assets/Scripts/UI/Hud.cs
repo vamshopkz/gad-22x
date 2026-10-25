@@ -345,6 +345,7 @@ namespace Gad
             BType.Hospital or BType.FireStation => new Color(0.95f, 0.25f, 0.25f),
             BType.School or BType.University or BType.Library => new Color(0.4f, 0.85f, 0.5f),
             BType.JobCenter => new Color(0.3f, 0.95f, 0.95f),
+            BType.Plot => new Color(0.35f, 0.8f, 0.35f),
             _ => new Color(0.6f, 0.55f, 0.5f),
         };
     }
