@@ -44,7 +44,9 @@ namespace Gad
             PostFx.Create();
             Streamer.Create();
             HouseWorld.Create();
+            InPlace.Create();
             Traffic.Create();
+            Guns.Create();
             new GameObject("Work").AddComponent<Work>();
             WorldNet.Create();
             Hud.Create();
@@ -70,7 +72,7 @@ namespace Gad
                 Save.D.px = p.x; Save.D.py = p.y; Save.D.pz = p.z; Save.D.pyaw = pl.transform.eulerAngles.y;
             }
             if (!Has("-autotest") && !Has("-mptest")) Save.Tick();
-            if (Input.GetKeyDown(KeyCode.Escape)) { if (UIRoot.Open != null) Window.Close(); else if (!MainMenu.Open) Menus.Phone(); }
+            if (Input.GetKeyDown(KeyCode.Escape)) { if (UIRoot.Open != null) Window.Close(); else if (PhoneUI.Open) PhoneUI.Close(); else if (!MainMenu.Open) PhoneUI.Show(); }
             if (Input.GetKeyDown(KeyCode.M) && !UIRoot.TypingText && !MainMenu.Open) { if (UIRoot.Open != null) Window.Close(); else Menus.Map(); }
             if (Input.GetKeyDown(KeyCode.Return) && !UIRoot.TypingText && UIRoot.Open == null && !MainMenu.Open) Menus.Chat();
         }

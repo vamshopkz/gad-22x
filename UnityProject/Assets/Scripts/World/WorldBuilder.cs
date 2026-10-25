@@ -170,7 +170,7 @@ namespace Gad
         }
 
         static bool Commercial(BType t) => t == BType.Shop || t == BType.Cafe || t == BType.Restaurant || t == BType.Supermarket || t == BType.Clothes
-                                         || t == BType.Furniture || t == BType.Gym || t == BType.Mall || t == BType.CarDealer || t == BType.GasStation;
+                                         || t == BType.Furniture || t == BType.Gym || t == BType.Mall || t == BType.CarDealer || t == BType.GasStation || t == BType.GunShop;
 
         static readonly Vector2 Tile = new Vector2(14f, 13.2f), StoreTile = new Vector2(14f, 17.6f);
 
@@ -290,7 +290,8 @@ namespace Gad
                     if (Commercial(b.type))
                     {
                         float g = Mathf.Min(h, 4.4f);
-                        m.Box(Store, Roof, new Vector3(x0, y0, z0), new Vector3(x1, y0 + g, z1), StoreTile, new Vector2(off.x, 0));
+                        if (InPlace.Eligible(b)) Storefront(m, b, g, off);   // 0.8: real glass, the shop is inside
+                        else m.Box(Store, Roof, new Vector3(x0, y0, z0), new Vector3(x1, y0 + g, z1), StoreTile, new Vector2(off.x, 0));
                         if (h > g + 0.5f)
                         {
                             var up = Facade[H.R(3, b.id, 9) switch { 0 => 1, 1 => 2, _ => 3 }];
@@ -360,6 +361,58 @@ namespace Gad
         }
 
         /// <summary>A coloured band on the front facade (shop signs).</summary>
+        static Material shopGlass, shopDark;
+
+        /// <summary>
+        /// 0.8: the ground floor of a walk-in shop: three walls in the shop-front texture, a real glass
+        /// front with mullions and a gap for the sliding doors, and a dark inside for when the shop's
+        /// interior is not built (far away).
+        /// </summary>
+        static void Storefront(MeshB m, Bld b, float g, Vector2 off)
+        {
+            if (shopGlass == null) { shopGlass = Mats.Glass(new Color(0.6f, 0.75f, 0.82f, 0.22f)); shopGlass.SetFloat("_Smoothness", 0.97f); }
+            if (shopDark == null) shopDark = Mats.Lit(new Color(0.06f, 0.06f, 0.07f), 0.2f);
+            float x0 = b.rect.xMin, z0 = b.rect.yMin, x1 = b.rect.xMax, z1 = b.rect.yMax, y0 = City.Curb, y1 = y0 + g;
+            // edges in order south, east, north, west, each walked so that its outside is on the right
+            var edges = new[] { (new Vector3(x0, 0, z0), new Vector3(x1, 0, z0), 0), (new Vector3(x1, 0, z0), new Vector3(x1, 0, z1), 3), (new Vector3(x1, 0, z1), new Vector3(x0, 0, z1), 1), (new Vector3(x0, 0, z1), new Vector3(x0, 0, z0), 2) };
+            Vector3 Y(Vector3 p, float y) => new Vector3(p.x, y, p.z);
+            foreach (var (p, q, side) in edges)
+            {
+                float len = Vector3.Distance(p, q);
+                if (side != b.front)
+                {
+                    m.Quad(Store, Y(p, y0), Y(p, y1), Y(q, y1), Y(q, y0), new Vector2(off.x, 0), new Vector2(off.x, g / StoreTile.y), new Vector2(off.x + len / StoreTile.x, g / StoreTile.y), new Vector2(off.x + len / StoreTile.x, 0));
+                    m.Quad(shopDark, Y(q, y0), Y(q, y1), Y(p, y1), Y(p, y0), Vector2.zero, Vector2.up, Vector2.one, Vector2.right);
+                    continue;
+                }
+                var dir = (q - p) / len;
+                float dc = Vector3.Dot(new Vector3(b.door.x, 0, b.door.z) - p, dir), gap = 1.3f, top = y1 - 1.2f;
+                void Pane(float a, float e)
+                {
+                    if (e - a < 0.05f) return;
+                    var pa = p + dir * a; var pe = p + dir * e;
+                    m.Quad(shopGlass, Y(pa, y0 + 0.12f), Y(pa, top), Y(pe, top), Y(pe, y0 + 0.12f), Vector2.zero, Vector2.up, Vector2.one, Vector2.right);
+                    m.Quad(shopGlass, Y(pe, y0 + 0.12f), Y(pe, top), Y(pa, top), Y(pa, y0 + 0.12f), Vector2.zero, Vector2.up, Vector2.one, Vector2.right);
+                    // mullions every 2.4 m and a kick plate
+                    for (float u = a; u <= e + 0.01f; u += Mathf.Max(0.5f, (e - a) / Mathf.Max(1, Mathf.Round((e - a) / 2.4f))))
+                    {
+                        var c = p + dir * u;
+                        m.Box(Frame, Frame, Y(c, y0) - new Vector3(0.05f, 0, 0.05f), Y(c, top) + new Vector3(0.05f, 0, 0.05f), new Vector2(1, 1));
+                    }
+                    m.Box(Frame, Frame, Vector3.Min(Y(pa, y0), Y(pe, y0)) - new Vector3(0.04f, 0, 0.04f), Vector3.Max(Y(pa, y0 + 0.12f), Y(pe, y0 + 0.12f)) + new Vector3(0.04f, 0, 0.04f), new Vector2(1, 1));
+                }
+                Pane(0f, dc - gap);
+                Pane(dc + gap, len);
+                // the wall above the glass (the shop sign band goes in front of it)
+                m.Quad(Store, Y(p, top), Y(p, y1), Y(q, y1), Y(q, top), new Vector2(off.x, (top - y0) / StoreTile.y), new Vector2(off.x, g / StoreTile.y), new Vector2(off.x + len / StoreTile.x, g / StoreTile.y), new Vector2(off.x + len / StoreTile.x, (top - y0) / StoreTile.y));
+                m.Box(Frame, Frame, Vector3.Min(Y(p, top - 0.08f), Y(q, top - 0.08f)) - new Vector3(0.05f, 0, 0.05f), Vector3.Max(Y(p, top), Y(q, top)) + new Vector3(0.05f, 0, 0.05f), new Vector2(1, 1));
+            }
+            // dark floor and ceiling inside, and the roof when the ground floor is all there is
+            m.Quad(shopDark, new Vector3(x0, y0 - 0.06f, z0), new Vector3(x0, y0 - 0.06f, z1), new Vector3(x1, y0 - 0.06f, z1), new Vector3(x1, y0 - 0.06f, z0), Vector2.zero, Vector2.up, Vector2.one, Vector2.right);   // under the shop's own floor
+            m.Quad(shopDark, new Vector3(x0, y1 - 0.01f, z1), new Vector3(x0, y1 - 0.01f, z0), new Vector3(x1, y1 - 0.01f, z0), new Vector3(x1, y1 - 0.01f, z1), Vector2.zero, Vector2.up, Vector2.one, Vector2.right);
+            if (b.height <= g + 0.5f) m.Flat(Roof, x0, z0, x1, z1, y1, 4f);
+        }
+
         static void Band(MeshB m, Bld b, float ya, float yb, Material mat, float width = -1)
         {
             const float o = 0.12f;
@@ -486,6 +539,21 @@ namespace Gad
             {
                 if (HouseWorld.IsReal(b)) continue;   // their own colliders come with the close-up house
                 float h = b.height + (b.type == BType.House ? 2.3f : 0.7f);
+                if (InPlace.Eligible(b))
+                {   // 0.8: a walk-in shop: walls round the ground floor with the door free, the floors above solid
+                    var r = b.rect; float g = Mathf.Min(b.height, InPlace.Ground), y1 = City.Curb + g;
+                    if (b.height > g) Bx(bgo, new Vector3(r.xMin, y1, r.yMin), new Vector3(r.xMax, City.Curb + h, r.yMax));
+                    const float t = 0.25f;
+                    var d = b.door;
+                    Vector3 A(float x, float z) => new Vector3(x, 0, z);
+                    void Wall(Vector3 a, Vector3 c) => Bx(bgo, new Vector3(Mathf.Min(a.x, c.x), 0, Mathf.Min(a.z, c.z)), new Vector3(Mathf.Max(a.x, c.x), y1, Mathf.Max(a.z, c.z)));
+                    // south, north, west, east; the front one in two pieces either side of the door
+                    if (b.front == 0) { Wall(A(r.xMin, r.yMin), A(d.x - 1.3f, r.yMin + t)); Wall(A(d.x + 1.3f, r.yMin), A(r.xMax, r.yMin + t)); } else Wall(A(r.xMin, r.yMin), A(r.xMax, r.yMin + t));
+                    if (b.front == 1) { Wall(A(r.xMin, r.yMax - t), A(d.x - 1.3f, r.yMax)); Wall(A(d.x + 1.3f, r.yMax - t), A(r.xMax, r.yMax)); } else Wall(A(r.xMin, r.yMax - t), A(r.xMax, r.yMax));
+                    if (b.front == 2) { Wall(A(r.xMin, r.yMin), A(r.xMin + t, d.z - 1.3f)); Wall(A(r.xMin, d.z + 1.3f), A(r.xMin + t, r.yMax)); } else Wall(A(r.xMin, r.yMin), A(r.xMin + t, r.yMax));
+                    if (b.front == 3) { Wall(A(r.xMax - t, r.yMin), A(r.xMax, d.z - 1.3f)); Wall(A(r.xMax - t, d.z + 1.3f), A(r.xMax, r.yMax)); } else Wall(A(r.xMax - t, r.yMin), A(r.xMax, r.yMax));
+                    continue;
+                }
                 Bx(bgo, new Vector3(b.rect.xMin, 0, b.rect.yMin), new Vector3(b.rect.xMax, City.Curb + h, b.rect.yMax));
                 if (b.type == BType.GasStation)
                 {

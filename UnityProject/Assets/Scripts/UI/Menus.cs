@@ -448,7 +448,7 @@ namespace Gad
             int price = from == null ? 60 : from.type == BType.Airport ? 200 : 80;
             Window.Show(from == null ? "ТАКСИ" : "БИЛЕТЫ", w =>
             {
-                w.Text("Куда отправимся? Цена " + Hud.Money(price), 26, UIKit.Muted);
+                w.Text(from == null ? "Куда поедем? Такси приедет к вам, оплата за весь путь сразу — если выйдете раньше, остаток вернём." : "Куда отправимся? Цена " + Hud.Money(price), 26, UIKit.Muted);
                 (string name, System.Func<Bld> where)[] dest =
                 {
                     ("Центр города", () => City.Nearest(BType.Tower, new Vector3(6.5f * City.P, 0, 7 * City.P))),
@@ -467,6 +467,12 @@ namespace Gad
                     var b = where();
                     if (b == null) continue;
                     if (from != null && b == from) continue;
+                    if (from == null)
+                    {   // 0.8: a real taxi comes and drives you there; pay for the way, get the rest back if you get out early
+                        long fare = Taxi.FareTo(b.ExitPoint);
+                        w.Row(name, $"{b.name} · {Hud.Money(fare)}", "ВЫЗВАТЬ", Green, () => { Window.Close(); Taxi.Order(b.ExitPoint, b.name); }, Save.D.money >= fare);
+                        continue;
+                    }
                     w.Row(name, b.name + " · " + b.address, "ПОЕХАЛИ", Green, () =>
                     {
                         if (!Eco.Spend(price, "Поездка")) return;

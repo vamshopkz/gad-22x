@@ -84,6 +84,9 @@ namespace Gad
         public List<OwnedHome> homes = new List<OwnedHome>();
         public List<OwnedBiz> biz = new List<OwnedBiz>();
         public List<PlotHouse> plots = new List<PlotHouse>();
+        public List<int> offices = new List<int>();     // 0.8: building * 1000 + floor of offices you own
+        public List<string> guns = new List<string>();  // 0.8: pistols you bought
+        public string gun = "";                          // the one in your hand ("" = none)
         public List<string> wardrobe = new List<string>();
         public float px = 0, py = 0, pz = 0, pyaw = 0;
         public bool created;

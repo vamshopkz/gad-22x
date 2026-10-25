@@ -56,6 +56,7 @@ namespace Gad
             Clip("eat", 0.5f, t => Noise() * (Mathf.Sin(t * 40) > 0.3f ? 1 : 0.1f) * Env(t, 0.01f, 0.25f) * 0.25f);
             Clip("chat", 0.25f, t => Mathf.Sin(t * 2 * Mathf.PI * (t < 0.1f ? 990 : 1320)) * Env(t, 0.004f, 0.06f) * 0.3f);
             Clip("crash", 0.8f, t => Noise() * Env(t, 0.003f, 0.2f) * 0.8f);
+            Clip("shot", 0.45f, t => (Noise() * Env(t, 0.0005f, 0.05f) + Mathf.Sin(t * 2 * Mathf.PI * (90 - t * 120)) * Env(t, 0.001f, 0.09f) * 0.7f) * 0.9f);
             float ph = 0;
             engine.clip = Clip("engine", 1f, t => { ph += 2 * Mathf.PI * 55f / SR; return (Mathf.Sin(ph) * 0.5f + Mathf.Sin(ph * 2) * 0.25f + Mathf.Sin(ph * 3.01f) * 0.12f + Noise() * 0.05f) * 0.5f; }, true);
             engine.loop = true; engine.volume = 0; engine.Play();

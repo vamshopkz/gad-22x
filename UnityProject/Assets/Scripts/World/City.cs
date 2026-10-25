@@ -133,6 +133,8 @@ namespace Gad
             [(6, 6)] = (BType.Hotel, false), [(10, 1)] = (BType.Hotel, false),
             [(7, 7)] = (BType.Parking, false), [(9, 5)] = (BType.Parking, false), [(4, 8)] = (BType.Parking, false),
             [(3, 2)] = (BType.GasStation, false), [(12, 5)] = (BType.GasStation, false), [(5, 12)] = (BType.GasStation, false),
+            [(8, 7)] = (BType.Corp, false), [(5, 8)] = (BType.Corp, false),
+            [(8, 4)] = (BType.GunShop, false), [(5, 9)] = (BType.GunShop, false),
             [(9, 7)] = (BType.Clothes, false), [(4, 6)] = (BType.Furniture, false), [(10, 4)] = (BType.Gym, false),
             [(3, 7)] = (BType.Garage, false), [(11, 11)] = (BType.Garage, false), [(5, 2)] = (BType.Garage, false),
             [(9, 9)] = (BType.Supermarket, false), [(4, 4)] = (BType.Supermarket, false), [(11, 8)] = (BType.Supermarket, false),
@@ -215,6 +217,9 @@ namespace Gad
                     case BType.Agency:
                         fp = Shrink(lot, front, 15, 3f, new Vector2(30, 30));
                         h = 20 * 3.6f; style = 0; break;
+                    case BType.Corp:
+                        fp = Shrink(lot, front, 2, 1f, new Vector2(24, 32));
+                        h = 30 * 3.3f; style = 7; break;
                     case BType.Tower:
                         fp = Shrink(lot, front, r.F(2, 5), 1f, new Vector2(r.F(20, 26), r.F(24, 36)));
                         h = r.F(70, 180); style = r.Chance(0.5f) ? 0 : 7; break;
@@ -310,6 +315,7 @@ namespace Gad
             var info = b.Info;
             if (b.type == BType.House) b.name = "Дом " + (b.id % 97 + 1);
             else if (b.type == BType.Plot) b.name = "Участок №" + (b.id % 89 + 1);
+            else if (b.type == BType.Corp) b.name = b.cx < 7 ? "Herbal Tower" : "Herbal Plaza";
             else if (b.type == BType.Agency) b.name = "Herbal City · Недвижимость";
             else b.name = H.Pick(info.Names, b.id, 77);
             if (b.cx >= 0)

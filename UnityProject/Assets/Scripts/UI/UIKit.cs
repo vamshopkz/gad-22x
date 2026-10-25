@@ -290,33 +290,77 @@ namespace Gad
     }
 
     /// <summary>
-    /// Drag anywhere on the right part of the screen to turn the camera: the view follows the finger
-    /// (left→right turns right, up→down looks down). The movement is measured from where this finger
-    /// touched, not from Unity's delta: on phones a finger id is reused, and the first delta of a new
-    /// touch is measured from where the previous touch with that id ended (e.g. the jump button),
-    /// which threw the camera there.
+    /// Drag anywhere on the free part of the screen to turn the camera: the view follows the finger
+    /// (left→right turns right, up→down looks down); a tap without moving does nothing.
+    /// On touch screens the fingers are read directly (Input.touches): a finger that went down on this
+    /// area is followed by its fingerId and only its own movement counts. Unity's mouse emulation of
+    /// touches is switched off — it turned every new tap into a mouse "drag" from the previous tap,
+    /// which swung the camera towards the tapped point. The mouse path below is for computers.
     /// </summary>
     public class LookArea : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
     {
         int pointer = int.MinValue;
         Vector2 last;
+        int finger = -1;
+        Vector2 fingerLast;
+        static bool Touch => Input.touchSupported || Application.isMobilePlatform;
+        static readonly List<RaycastResult> hits = new List<RaycastResult>();
+
+        void Awake() { if (Touch) Input.simulateMouseWithTouches = false; }
+
+        /// <summary>Is this screen point on the look area itself (not on a button or the joystick)?</summary>
+        bool Mine(Vector2 pos)
+        {
+            var es = EventSystem.current;
+            if (es == null) return false;
+            hits.Clear();
+            es.RaycastAll(new PointerEventData(es) { position = pos }, hits);
+            return hits.Count > 0 && hits[0].gameObject == gameObject;
+        }
+
+        static void Turn(Vector2 d)
+        {
+            if (PlayerCtl.I == null) return;
+            float lim = Screen.height * 0.25f;
+            if (d.sqrMagnitude > lim * lim) return;   // never a real finger move between two frames
+            float k = 1600f / Mathf.Max(800, Screen.width) * 0.9f;
+            PlayerCtl.I.LookDelta += new Vector2(d.x * k, -d.y * k * 0.8f);
+        }
+
+        void Update()
+        {
+            if (Input.touchCount == 0) { finger = -1; if (Touch) UIRoot.LookActive = pointer != int.MinValue; return; }
+            bool alive = false;
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                var t = Input.GetTouch(i);
+                if (finger < 0 && t.phase == TouchPhase.Began && Mine(t.position)) { finger = t.fingerId; fingerLast = t.position; alive = true; continue; }
+                if (t.fingerId != finger) continue;
+                alive = t.phase != TouchPhase.Ended && t.phase != TouchPhase.Canceled;
+                if (t.phase == TouchPhase.Moved) Turn(t.position - fingerLast);
+                fingerLast = t.position;
+            }
+            if (!alive) finger = -1;
+            UIRoot.LookActive = finger >= 0;
+        }
+
+        // ---- mouse (computers); touches are handled in Update
         public void OnPointerDown(PointerEventData e)
         {
-            if (pointer != int.MinValue) return;
+            if (e.pointerId >= 0 && Touch) return;
             pointer = e.pointerId; last = e.position; UIRoot.LookActive = true;
         }
         public void OnDrag(PointerEventData e)
         {
             if (e.pointerId != pointer || PlayerCtl.I == null) return;
-            var d = e.position - last;
+            Turn(e.position - last);
             last = e.position;
-            float lim = Screen.height * 0.25f;
-            if (d.sqrMagnitude > lim * lim) return;   // a stray jump, never a real finger move
-            float k = 1600f / Mathf.Max(800, Screen.width) * 0.9f;
-            PlayerCtl.I.LookDelta += new Vector2(d.x * k, -d.y * k * 0.8f);
         }
         public void OnPointerUp(PointerEventData e) { if (e.pointerId == pointer) { pointer = int.MinValue; UIRoot.LookActive = false; } }
-        void OnDisable() { pointer = int.MinValue; UIRoot.LookActive = false; }
+        void OnDisable() { pointer = int.MinValue; finger = -1; UIRoot.LookActive = false; }
+
+        /// <summary>For tests: feed a finger as if it touched the screen.</summary>
+        public void TestFinger(Vector2 from, Vector2 to) { finger = 99; fingerLast = from; Turn(to - from); finger = -1; }
     }
 
     /// <summary>Canvas, event system and the modal window used by every menu.</summary>

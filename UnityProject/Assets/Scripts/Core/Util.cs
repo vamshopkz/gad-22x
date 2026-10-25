@@ -301,6 +301,25 @@ namespace Gad
     /// <summary>Procedural textures (no downloaded assets): facades, asphalt, grass, tiles…</summary>
     public static class Tex
     {
+        static Texture2D target;
+        /// <summary>0.8: a shooting target: black and white rings with a red bull's-eye.</summary>
+        public static Texture2D Target()
+        {
+            if (target != null) return target;
+            const int S = 128;
+            target = new Texture2D(S, S, TextureFormat.RGBA32, true) { name = "target" };
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float r = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(S / 2f, S / 2f)) / (S / 2f);
+                    int ring = Mathf.FloorToInt(r * 10f);
+                    Color c = r < 0.1f ? new Color(0.85f, 0.1f, 0.1f) : r > 1f ? new Color(0.9f, 0.85f, 0.7f) : ring % 2 == 0 ? Color.white : new Color(0.1f, 0.1f, 0.1f);
+                    target.SetPixel(x, y, c);
+                }
+            target.Apply(true);
+            return target;
+        }
+
         static readonly Dictionary<string, Texture2D> cache = new Dictionary<string, Texture2D>();
 
         static Texture2D New(int w, int h, string name)

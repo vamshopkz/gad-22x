@@ -25,7 +25,7 @@ namespace Gad
             d.B = b;
             d.w = b.type == BType.Mall || b.type == BType.Airport || b.type == BType.Station || b.type == BType.Agency ? 2.2f : 1.2f;
             bool house = b.type == BType.House || b.type == BType.Villa;
-            var glass = house ? WorldBuilder.Wood : Mats.Glass(new Color(0.55f, 0.75f, 0.85f, 0.35f));
+            var glass = house ? WorldBuilder.Wood : Mats.Glass(new Color(0.6f, 0.75f, 0.82f, InPlace.Eligible(b) ? 0.2f : 0.35f));
             float hh = b.type == BType.House ? 2.3f : 2.8f;
             d.l = Leaf(go.transform, glass, new Vector3(-d.w / 2, hh / 2, 0), new Vector3(d.w, hh, 0.05f), house);
             d.r = Leaf(go.transform, glass, new Vector3(d.w / 2, hh / 2, 0), new Vector3(d.w, hh, 0.05f), house);
@@ -54,7 +54,7 @@ namespace Gad
             var p = pl.transform.position;
             var to = p - B.door; to.y = 0;
             float dist = to.magnitude;
-            bool walker = pl.Car == null && pl.Inside < 0;
+            bool walker = pl.Car == null && (pl.Inside < 0 || (pl.Inside == B.id && InPlace.Eligible(B)));   // walk-in shops: open from inside too
             bool near = walker && dist < 4.5f;
             foreach (var rp in WorldNet.Remotes.Values) if (rp != null && rp.InsideCode < 0 && (rp.transform.position - B.door).sqrMagnitude < 9f) near = true;
             open = Mathf.MoveTowards(open, near ? 1 : 0, Time.deltaTime * 2.2f);
@@ -62,7 +62,8 @@ namespace Gad
             l.localPosition = new Vector3(-w / 2 - s, l.localPosition.y, 0);
             r.localPosition = new Vector3(w / 2 + s, r.localPosition.y, 0);
 
-            // walking into the open doorway takes you in
+            // walking into the open doorway takes you in (shops built in place: you just walk in)
+            if (InPlace.Eligible(B)) return;
             if (walker && open > 0.75f && dist < 1.25f && !pl.Frozen && Time.unscaledTime > cooldown)
             {
                 var v = pl.CC.velocity; v.y = 0;

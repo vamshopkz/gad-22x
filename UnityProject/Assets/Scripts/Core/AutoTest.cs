@@ -21,7 +21,39 @@ namespace Gad
         {
             dir = Boot.Arg("-shots") ?? Path.Combine(Application.persistentDataPath, "shots");
             Directory.CreateDirectory(dir);
-            StartCoroutine(Multiplayer ? Mp() : Boot.Has("-homes") ? Homes() : Run());
+            StartCoroutine(Multiplayer ? Mp() : Boot.Has("-homes") ? Homes() : Boot.Has("-shop") ? ShopLook() : Run());
+        }
+
+        /// <summary>Quick look at a walk-in shop: free camera inside and outside, and a log of where things are.</summary>
+        IEnumerator ShopLook()
+        {
+            var pl = PlayerCtl.I;
+            DayNight.TestHour = 13f; Weather.TestState = 0;
+            yield return Wait(2f);
+            Bld sb = null; float best = 1e9f;
+            foreach (var x in City.All) if (InPlace.Eligible(x) && x.type == BType.Cafe) { float dd = (x.door - City.Spawn).sqrMagnitude; if (dd < best) { best = dd; sb = x; } }
+            var din = -sb.FrontDir;
+            pl.Teleport(sb.door - din * 2.6f + Vector3.up * 0.2f, Mathf.Atan2(din.x, din.z) * Mathf.Rad2Deg);
+            yield return Wait(3f);
+            pl.MoveInput = new Vector2(0, 1);
+            float tw = 0; while (tw < 4f && pl.Inside != sb.id) { tw += Time.deltaTime; yield return null; }
+            yield return Wait(0.8f);
+            pl.MoveInput = Vector2.zero;
+            var shop = GameObject.Find("Shop " + sb.name);
+            Debug.Log($"[ShopLook] {sb.name} rect={sb.rect} door={sb.door} front={sb.front} fit={InPlace.Fit(sb):0.00} player={pl.transform.position} inside={pl.Inside} shop={(shop ? shop.transform.position.ToString() + " rot " + shop.transform.eulerAngles + " scale " + shop.transform.localScale : "none")}");
+            if (shop) foreach (var r in shop.GetComponentsInChildren<Renderer>()) Debug.Log($"[ShopLook] renderer {r.name} bounds {r.bounds.center} {r.bounds.size} enabled={r.enabled} layer={r.gameObject.layer}");
+            Debug.Log($"[ShopLook] cam={pl.Cam.transform.position} fwd={pl.Cam.transform.forward} yaw={pl.Yaw} pitch={pl.Pitch} dist={pl.Dist}");
+            yield return Shot("s1_player_view");
+            pl.MoveInput = new Vector2(0, 1); yield return Wait(1.0f); pl.MoveInput = Vector2.zero; yield return Wait(0.5f);
+            Debug.Log($"[ShopLook] after walk player={pl.transform.position} cam={pl.Cam.transform.position}");
+            yield return Shot("s1b_player_view_further");
+            PlayerCtl.ShotCam = true;
+            var c = new Vector3(sb.rect.center.x, City.Curb + 1.7f, sb.rect.center.y);
+            PlayerCtl.ShotPos = c - din * 2f; PlayerCtl.ShotLook = c + din * 5f; yield return Wait(0.4f); yield return Shot("s2_inside_back");
+            PlayerCtl.ShotPos = c + din * 2f; PlayerCtl.ShotLook = c - din * 8f; yield return Wait(0.4f); yield return Shot("s3_inside_front");
+            PlayerCtl.ShotPos = sb.door - din * 6f + Vector3.up * 1.7f; PlayerCtl.ShotLook = c; yield return Wait(0.4f); yield return Shot("s4_outside");
+            PlayerCtl.ShotCam = false;
+            Finish();
         }
 
         void Check(string name, bool ok, string info = "")
@@ -64,7 +96,7 @@ namespace Gad
             pl.Yaw = 0;
             var p0 = pl.transform.position;
             pl.MoveInput = new Vector2(0, 1);
-            yield return Wait(1.5f);
+            yield return Wait(2.5f);
             pl.MoveInput = Vector2.zero;
             Check("ходьба", (pl.transform.position - p0).magnitude > 2f, (pl.transform.position - p0).magnitude.ToString("0.0") + " м");
 
@@ -98,6 +130,97 @@ namespace Gad
                 n++;
             }
 
+            // 0.8: shops are inside their own building behind real glass: walk straight in
+            {
+                Bld sb = null; float best = 1e9f;
+                foreach (var x in City.All) if (InPlace.Eligible(x) && x.type == BType.Cafe) { float dd = (x.door - City.Spawn).sqrMagnitude; if (dd < best) { best = dd; sb = x; } }
+                int count = City.All.FindAll(x => InPlace.Eligible(x)).Count;
+                Check("магазины с настоящими витринами", count > 40, count + " шт.");
+                if (sb != null)
+                {
+                    var din = -sb.FrontDir;
+                    float yin = Mathf.Atan2(din.x, din.z) * Mathf.Rad2Deg;
+                    pl.Teleport(sb.door - din * 2.6f + Vector3.up * 0.2f, yin);
+                    pl.Pitch = 8; pl.Dist = 6f;
+                    yield return Wait(3.0f);
+                    yield return Shot("68_shop_front");
+                    pl.MoveInput = new Vector2(0, 1);
+                    float tw = 0; while (tw < 4f && pl.Inside != sb.id) { tw += Time.deltaTime; yield return null; }
+                    yield return Wait(0.8f);
+                    pl.MoveInput = Vector2.zero;
+                    Check("зашёл в кафе пешком", pl.Inside == sb.id && Interiors.Current == sb && pl.transform.position.y > -50, pl.Inside + "");
+                    yield return Shot("69_shop_inside");
+                    pl.Yaw = yin + 180; yield return Wait(0.4f);
+                    yield return Shot("69_shop_inside_out");
+                    Interiors.Exit(); yield return Wait(0.3f);
+                    Check("вышел из кафе", pl.Inside < 0);
+                }
+            }
+
+            // 0.8: gun shop, office towers with your own computer
+            {
+                var gs = City.Nearest(BType.GunShop, pl.transform.position);
+                Check("оружейный магазин есть", gs != null);
+                if (gs != null)
+                {
+                    pl.Teleport(gs.door + gs.FrontDir * 1.5f, 0);
+                    yield return null;
+                    Interiors.Enter(gs); yield return Wait(0.8f);
+                    pl.Yaw = 0; pl.Pitch = 10;
+                    if (!Save.D.guns.Contains("glock")) Save.D.guns.Add("glock");
+                    Guns.Equip("glock");
+                    yield return Wait(0.3f);
+                    Guns.Fire();
+                    yield return Wait(0.2f);
+                    yield return Shot("74_gun_shop");
+                    Check("пистолет в руке", Guns.Armed);
+                    Guns.Toggle(); Save.D.guns.Clear();
+                    Interiors.Exit(); yield return null;
+                }
+                var corp = City.Nearest(BType.Corp, pl.transform.position);
+                Check("два офисных небоскрёба", City.All.FindAll(x => x.type == BType.Corp).Count == 2);
+                if (corp != null)
+                {
+                    pl.Teleport(corp.door + corp.FrontDir * 1.5f, 0);
+                    yield return null;
+                    Interiors.Enter(corp); yield return Wait(0.5f);
+                    Save.D.offices.Add(corp.id * 1000 + 7);
+                    Interiors.BuildLevel(7);
+                    pl.Teleport(Interiors.O + new Vector3(Interiors.EX, 7 * Elevator.FH + 0.1f, Interiors.EZ - 4f), 180);
+                    yield return Wait(0.8f);
+                    Check("свой офис с компьютером", Interiors.Points.Exists(p => p.Label == "МОЙ КОМПЬЮТЕР"));
+                    yield return Shot("75_my_office");
+                    PhoneUI.ShowComputer(); yield return Wait(0.6f); yield return Shot("76_office_computer");
+                    PhoneUI.Close();
+                    Save.D.offices.Clear();
+                    Interiors.Exit(); yield return null;
+                }
+            }
+
+            // 0.8: taxi — it comes, you get in, it drives, you get out early and get the rest back
+            {
+                pl.Teleport(City.Spawn, 0); yield return Wait(0.5f);
+                long m0 = Save.D.money;
+                var dest = City.Nearest(BType.Station, Vector3.zero);
+                Taxi.Order(dest.ExitPoint, dest.name);
+                float tw0 = Time.realtimeSinceStartup;
+                while (Taxi.Active && !Taxi.Waiting && Time.realtimeSinceStartup - tw0 < 60f) yield return null;
+                Check("такси приехало", Taxi.Waiting, $"{Time.realtimeSinceStartup - tw0:0} с");
+                pl.Pitch = 14; pl.Dist = 7;
+                yield return Shot("77_taxi_arrived");
+                Taxi.I?.BoardNow();
+                tw0 = Time.realtimeSinceStartup;
+                while (!Taxi.Riding && Time.realtimeSinceStartup - tw0 < 15f) yield return null;
+                Check("сел в такси", Taxi.Riding);
+                yield return Wait(6f);
+                yield return Shot("78_taxi_ride");
+                long beforeExit = Save.D.money;
+                Taxi.I?.ExitNow();
+                yield return Wait(1.2f);
+                Check("вышел из такси, остаток вернули", !Taxi.Riding && Save.D.money > beforeExit, $"заплачено {m0 - Save.D.money}");
+                yield return Shot("79_taxi_exit");
+            }
+
             // 0.7: real houses — walk in through the front door, no separate interior
             {
                 int plots = City.All.FindAll(x => x.type == BType.Plot).Count;
@@ -105,6 +228,7 @@ namespace Gad
                 var names = new HashSet<string>();
                 for (int i = 0; i < HouseDesign.Count; i++) names.Add(HouseDesign.Get(i).name);
                 Check("100 проектов домов", names.Count >= 95, names.Count + " разных");
+                Save.D.energy = 100; Save.D.food = 100;
                 var hb2 = City.Nearest(BType.House, City.Spawn);
                 var dirIn = -hb2.FrontDir;
                 float yawIn = Mathf.Atan2(dirIn.x, dirIn.z) * Mathf.Rad2Deg;
@@ -115,7 +239,8 @@ namespace Gad
                 yield return Shot("70_real_house_out");
                 pl.MoveInput = new Vector2(0, 1);
                 float tw = 0;
-                while (tw < 3.2f) { tw += Time.deltaTime; yield return null; }
+                while (tw < 3.2f && !hb2.rect.Contains(new Vector2(pl.transform.position.x, pl.transform.position.z))) { tw += Time.deltaTime; yield return null; }
+                tw = 0; while (tw < 0.8f) { tw += Time.deltaTime; yield return null; }
                 pl.MoveInput = Vector2.zero;
                 yield return Wait(0.6f);
                 var pp = pl.transform.position;
@@ -444,6 +569,9 @@ namespace Gad
             pl.Teleport(City.Spawn, 0);
             yield return Wait(0.5f);
             Menus.Phone(); yield return Wait(0.4f); yield return Shot("60_phone"); Window.Close();
+            PhoneUI.Show(); yield return Wait(0.6f); yield return Shot("60_phone_half");
+            Check("телефон на пол-экрана", PhoneUI.Open);
+            PhoneUI.Close(); yield return null;
             Menus.Map(); yield return Wait(0.4f); yield return Shot("61_map"); Window.Close();
             Menus.Dress(false, true); yield return Wait(5f); yield return Shot("62_create"); Window.Close();
             // title screen

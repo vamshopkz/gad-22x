@@ -33,7 +33,7 @@ namespace Gad
         static float W, D, Hh;
 
         public static int Code => Current == null ? -1 : Current.id * 1000 + Unit;
-        public static bool HasLift(Bld b) => b.type == BType.Apartment || b.type == BType.Tower || b.type == BType.Office || b.type == BType.Hotel || b.type == BType.Agency;
+        public static bool HasLift(Bld b) => b.type == BType.Apartment || b.type == BType.Tower || b.type == BType.Office || b.type == BType.Hotel || b.type == BType.Agency || b.type == BType.Corp;
         public static int TopFloor(Bld b) => b.type == BType.Agency ? 19 : Mathf.Max(1, b.floors - 1);
 
         public static ActionPoint NearestPoint(Vector3 p, float max)
@@ -53,6 +53,12 @@ namespace Gad
         public static void Enter(Bld b, int unit = 0)
         {
             var pl = PlayerCtl.I;
+            if (unit == 0 && InPlace.I != null && InPlace.Eligible(b))
+            {   // 0.8: shops are inside their own building: go there
+                if (Root != null && !inPlaceActive) { Clear(); pl.Inside = -1; Streamer.SetOutdoor(true); }
+                InPlace.EnterNow(b);
+                return;
+            }
             if (pl.Inside < 0) { Save.D.px = pl.transform.position.x; Save.D.py = pl.transform.position.y; Save.D.pz = pl.transform.position.z; }
             Build(b, unit);
             pl.Inside = b.id;
@@ -65,6 +71,7 @@ namespace Gad
 
         public static void Exit()
         {
+            if (inPlaceActive) { InPlace.ExitNow(); return; }
             var b = Current;
             Clear();
             var pl = PlayerCtl.I;
@@ -83,6 +90,62 @@ namespace Gad
             Points.Clear(); pointsFlushed = 0;
         }
 
+        // ------------------------------------------------------------------ 0.8: shops built inside their own building
+
+        public static bool InPlaceMode;
+        static bool inPlaceActive;
+
+        /// <summary>
+        /// Builds the ground floor of a shop at its real place (pos/rot = the front door, facing in),
+        /// shrunk by scale to fit the building. The current interior state is left as it was.
+        /// </summary>
+        public static GameObject BuildInPlace(Bld b, Vector3 pos, Quaternion rot, float scale, out List<ActionPoint> points)
+        {
+            var sCur = Current; var sRoot = Root; var sLevel = Level; var sCtr = Ctr; int sUnit = Unit;
+            var sPts = new List<ActionPoint>(Points); int sFl = pointsFlushed; var sMb = mb; var sRng = rng;
+            float sW = W, sD = D, sH = Hh, sEX = EX, sEZ = EZ; var sEl = Elevator.I;
+            Points.Clear(); pointsFlushed = 0;
+            Current = b;
+            Root = new GameObject("Shop " + b.name).transform;
+            Root.SetPositionAndRotation(pos, rot);
+            Root.localScale = Vector3.one * Mathf.Min(1f, scale);
+            Level = null; Unit = 0;
+            InPlaceMode = true;
+            try { BuildLevel(0); }
+            finally { InPlaceMode = false; }
+            points = new List<ActionPoint>(Points);
+            var go = Root.gameObject;
+            // the building above keeps the sun out: real lamps under the ceiling light the shop
+            for (int i = 0; i < 2; i++)
+                for (int j = 0; j < 2; j++)
+                {
+                    var lg = new GameObject("ShopLight").AddComponent<Light>();
+                    lg.transform.SetParent(Root, false);
+                    lg.transform.localPosition = new Vector3((i - 0.5f) * W * 0.5f, Mathf.Max(2.8f, Hh - 0.5f), D * (0.3f + j * 0.4f));
+                    lg.type = LightType.Point; lg.range = Mathf.Max(W, D) * 0.9f; lg.intensity = 1.6f;
+                    lg.color = new Color(1f, 0.95f, 0.86f); lg.shadows = LightShadows.None;
+                }
+            Current = sCur; Root = sRoot; Level = sLevel; Ctr = sCtr; Unit = sUnit;
+            Points.Clear(); Points.AddRange(sPts); pointsFlushed = sFl; mb = sMb; rng = sRng;
+            W = sW; D = sD; Hh = sH; EX = sEX; EZ = sEZ; Elevator.I = sEl;
+            return go;
+        }
+
+        /// <summary>The player walked into a shop built in place: its counters and actions become the current ones.</summary>
+        public static void UseInPlace(Bld b, List<ActionPoint> pts)
+        {
+            Current = b; inPlaceActive = true;
+            Points.Clear(); Points.AddRange(pts);
+        }
+
+        public static void LeaveInPlace()
+        {
+            if (!inPlaceActive) return;
+            inPlaceActive = false; Current = null;
+            Points.Clear();
+            Work.Cancel("Вы ушли со смены");
+        }
+
         static void Point(Vector3 local, string label, Action act) => Points.Add(new ActionPoint { Pos = Ctr.TransformPoint(local), Label = label, Act = act });
 
         // ------------------------------------------------------------------ building blocks
@@ -98,10 +161,14 @@ namespace Gad
             // floor + ceiling
             mb.Box(Mats.Lit(wall * 0.8f), floor, new Vector3(-w / 2, -0.3f, 0), new Vector3(w / 2, 0, d), new Vector2(4, 4));
             mb.Box(wallMat, wallMat, new Vector3(-w / 2, h, 0), new Vector3(w / 2, h + 0.2f, d), new Vector2(4, 4), default, true, Mats.Lit(new Color(0.92f, 0.92f, 0.9f)));
-            // walls (door gap in the south wall)
-            mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, -0.3f), new Vector3(-dh, h, 0), new Vector2(4, 4));
-            mb.Box(wallMat, wallMat, new Vector3(dh, 0, -0.3f), new Vector3(w / 2 + 0.3f, h, 0), new Vector2(4, 4));
-            mb.Box(wallMat, wallMat, new Vector3(-dh, 2.7f, -0.3f), new Vector3(dh, h, 0), new Vector2(4, 4));
+            // walls (door gap in the south wall); built in place the front is the building's glass shop front
+            if (InPlaceMode) { windows = false; street = false; }
+            else
+            {
+                mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, -0.3f), new Vector3(-dh, h, 0), new Vector2(4, 4));
+                mb.Box(wallMat, wallMat, new Vector3(dh, 0, -0.3f), new Vector3(w / 2 + 0.3f, h, 0), new Vector2(4, 4));
+                mb.Box(wallMat, wallMat, new Vector3(-dh, 2.7f, -0.3f), new Vector3(dh, h, 0), new Vector2(4, 4));
+            }
             mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, d), new Vector3(w / 2 + 0.3f, h, d + 0.3f), new Vector2(4, 4));
             mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, 0), new Vector3(-w / 2, h, d), new Vector2(4, 4));
             mb.Box(wallMat, wallMat, new Vector3(w / 2, 0, 0), new Vector3(w / 2 + 0.3f, h, d), new Vector2(4, 4));
@@ -110,7 +177,7 @@ namespace Gad
             mb.Box(sk, sk, new Vector3(-w / 2, 0, d - 0.05f), new Vector3(w / 2, 0.12f, d), new Vector2(4, 4));
             // exit door: light rectangle with the street behind
             if (street) mb.Box(Mats.Glow(DayNight.IsNight ? new Color(0.12f, 0.14f, 0.25f) : new Color(0.75f, 0.85f, 0.95f)), null, new Vector3(-1.4f, 0, -0.62f), new Vector3(1.4f, 2.7f, -0.6f), new Vector2(4, 4));
-            mb.Box(Mats.Lit(new Color(0.2f, 0.2f, 0.22f)), null, new Vector3(-dh - 0.1f, 2.7f, -0.05f), new Vector3(dh + 0.1f, 2.85f, 0.05f), new Vector2(4, 4));
+            if (!InPlaceMode) mb.Box(Mats.Lit(new Color(0.2f, 0.2f, 0.22f)), null, new Vector3(-dh - 0.1f, 2.7f, -0.05f), new Vector3(dh + 0.1f, 2.85f, 0.05f), new Vector2(4, 4));
             if (windows)
             {
                 var glow = Mats.Glow(DayNight.IsNight ? new Color(0.08f, 0.1f, 0.2f) : new Color(0.65f, 0.82f, 0.98f));
@@ -766,6 +833,58 @@ namespace Gad
                     Point(new Vector3(0, 0, 6), "ТРЕНИРОВКА (−20 энергии)", () => Menus.Gym(b));
                     break;
 
+                case BType.GunShop:
+                {
+                    Room(16, 14, 3.8f, tiles, new Color(0.3f, 0.3f, 0.33f));
+                    // glass counters with pistols on show
+                    for (int k = 0; k < 3; k++)
+                    {
+                        var cpos = new Vector3(-4.5f + k * 4.5f, 0, 4.2f);
+                        Box(cpos + new Vector3(-1.8f, 0, -0.45f), cpos + new Vector3(1.8f, 0.9f, 0.45f), new Color(0.12f, 0.12f, 0.14f), true);
+                        BoxM(cpos + new Vector3(-1.8f, 0.9f, -0.45f), cpos + new Vector3(1.8f, 0.92f, 0.45f), Mats.Glass(new Color(0.7f, 0.85f, 0.95f, 0.3f)));
+                        for (int g = 0; g < 2; g++)
+                        {
+                            var gd = GunDef.All[(k * 2 + g) % GunDef.All.Count];
+                            var gun = Guns.Model(gd, Ctr, out _);
+                            gun.transform.localPosition = cpos + new Vector3(-0.7f + g * 1.4f, 0.93f, 0);
+                            gun.transform.localRotation = Quaternion.Euler(0, 90, 90);
+                            gun.transform.localScale = Vector3.one * 1.6f;
+                        }
+                    }
+                    // wall boards with pistols, a sign, the cashier
+                    for (int k = 0; k < 6; k++)
+                    {
+                        var gd = GunDef.All[k % GunDef.All.Count];
+                        var gun = Guns.Model(gd, Ctr, out _);
+                        gun.transform.localPosition = new Vector3(-W / 2 + 0.12f, 1.5f + (k % 2) * 0.6f, 3f + (k / 2) * 1.4f);
+                        gun.transform.localRotation = Quaternion.Euler(0, 0, 90);
+                        gun.transform.localScale = Vector3.one * 1.8f;
+                    }
+                    Box(new Vector3(-W / 2, 1.1f, 2.2f), new Vector3(-W / 2 + 0.08f, 2.4f, 7.2f), new Color(0.35f, 0.25f, 0.15f), true);
+                    Npc(new Vector3(0, 0, 5.4f), 180, b.id, 0);
+                    Point(new Vector3(0, 0, 3.0f), "КАССА: КУПИТЬ ПИСТОЛЕТ", GunMenus.Shop);
+                    // the shooting range behind a glass wall: lanes with round targets
+                    Box(new Vector3(-W / 2, 0, 8.6f), new Vector3(W / 2, 1.1f, 8.8f), new Color(0.2f, 0.2f, 0.22f), true);
+                    for (int k = 0; k < 4; k++)
+                    {
+                        float tx = -5.25f + k * 3.5f;
+                        var tg = Prim.Make(PrimitiveType.Cylinder, Ctr, new Vector3(tx, 1.5f, D - 0.5f), new Vector3(0.8f, 0.02f, 0.8f), Mats.Tex(Tex.Target(), Color.white, 0.2f), "Target");
+                        tg.transform.localRotation = Quaternion.Euler(90, 0, 0);
+                        tg.layer = 10;
+                        tg.AddComponent<RangeTarget>();
+                        Box(new Vector3(tx - 0.03f, 0, D - 0.55f), new Vector3(tx + 0.03f, 1.1f, D - 0.45f), new Color(0.3f, 0.3f, 0.3f));
+                    }
+                    Point(new Vector3(0, 0, 7.6f), "ТИР: ВЗЯТЬ ПИСТОЛЕТ И СТРЕЛЯТЬ", () =>
+                    {
+                        if (Save.D.guns.Count == 0) { GunMenus.Shop(); return; }
+                        if (!Guns.Armed) Guns.Toggle();
+                        PlayerCtl.I.Yaw = 0; PlayerCtl.I.Pitch = 4; PlayerCtl.I.Dist = 2.4f;
+                        Hud.Toast("Цельтесь в мишени и жмите «ОГОНЬ»", UIKit.Cyan);
+                    });
+                    Sign(new Vector3(0, 3.3f, 2.2f), b.name, accent, 4);
+                    break;
+                }
+
                 case BType.Clothes:
                     Room(18, 15, 4f, wood, new Color(0.97f, 0.95f, 0.93f));
                     ClothingShop(new Vector3(0, 0, 0.6f), 16f, 13f, b.id);
@@ -934,7 +1053,7 @@ namespace Gad
         static void UpperFloor(Bld b, int floor)
         {
             if (b.type == BType.Agency && floor >= 19) { OpenFloor(b, floor, true); return; }
-            bool office = b.type == BType.Office || b.type == BType.Agency || (b.type == BType.Tower && floor <= b.floors / 2);
+            bool office = b.type == BType.Office || b.type == BType.Agency || b.type == BType.Corp || (b.type == BType.Tower && floor <= b.floors / 2);
             if (office) { OpenFloor(b, floor, false); return; }
             Corridor(b, floor, b.type == BType.Tower, b.type == BType.Hotel);
         }
@@ -1056,7 +1175,32 @@ namespace Gad
                 Plant(new Vector3(-w / 2 + 1, 0, d - 1)); Plant(new Vector3(w / 2 - 1, 0, d - 1));
                 string title = b.type == BType.Agency ? "АГЕНТСТВО «HERBAL CITY» · ЭТАЖ " + (floor + 1) : b.name + " · ЭТАЖ " + (floor + 1);
                 Sign(new Vector3(0, 2.8f, d - 0.1f), title, b.Info.Sign, 4);
-                Point(new Vector3(3.5f, 0, 3.5f), b.type == BType.Agency ? "АГЕНТ: КУПИТЬ ЖИЛЬЁ" : "РЕСЕПШН: РАБОТА И БИЗНЕС", () => { if (b.type == BType.Agency) Menus.RealEstate(); else Menus.Building(b); });
+                if (b.type == BType.Corp)
+                {
+                    // 0.8: offices for sale floor by floor; in your own one a big desk with your computer
+                    int code = b.id * 1000 + floor;
+                    long price = 80000 + floor * 4000;
+                    if (Save.D.offices.Contains(code))
+                    {
+                        var dp = new Vector3(0, 0, 3.2f);
+                        Box(dp + new Vector3(-1.4f, 0.72f, -0.6f), dp + new Vector3(1.4f, 0.78f, 0.6f), new Color(0.25f, 0.17f, 0.1f), true);
+                        Box(dp + new Vector3(-0.55f, 0.78f, 0.25f), dp + new Vector3(0.55f, 1.42f, 0.3f), new Color(0.05f, 0.05f, 0.06f));
+                        BoxM(dp + new Vector3(-0.52f, 0.82f, 0.245f), dp + new Vector3(0.52f, 1.39f, 0.25f), Mats.Glow(new Color(0.25f, 0.6f, 0.95f)));
+                        Chair(dp + new Vector3(0, 0, -0.95f), 0, new Color(0.1f, 0.1f, 0.12f));
+                        Sign(new Vector3(0, 2.8f, d - 0.1f), "ВАШ ОФИС · " + b.name + " · ЭТАЖ " + (floor + 1), new Color(0.3f, 1f, 0.5f), 4);
+                        Point(dp + new Vector3(0, 0, -1.2f), "МОЙ КОМПЬЮТЕР", () => PhoneUI.ShowComputer());
+                    }
+                    else Point(new Vector3(3.5f, 0, 3.5f), "КУПИТЬ ЭТОТ ЭТАЖ ПОД ОФИС — " + Hud.Money(price), () =>
+                    {
+                        if (!Eco.Spend(price, "Офис " + b.name)) return;
+                        Save.D.offices.Add(code); Save.Write();
+                        Hud.Toast("Офис ваш! Садитесь за компьютер", new Color(0.5f, 1f, 0.6f));
+                        var pos = PlayerCtl.I.transform.position; float yaw = PlayerCtl.I.transform.eulerAngles.y;
+                        BuildLevel(Floor);
+                        PlayerCtl.I.Teleport(pos, yaw);
+                    });
+                }
+                else Point(new Vector3(3.5f, 0, 3.5f), b.type == BType.Agency ? "АГЕНТ: КУПИТЬ ЖИЛЬЁ" : "РЕСЕПШН: РАБОТА И БИЗНЕС", () => { if (b.type == BType.Agency) Menus.RealEstate(); else Menus.Building(b); });
             }
             Flush();
             Ctr = Level;

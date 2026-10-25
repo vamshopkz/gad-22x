@@ -87,7 +87,7 @@ namespace Gad
 
             // taken cars left far behind disappear
             foreach (var c in Car.Live.ToArray())
-                if (c != null && !c.Traffic && c.OwnedIndex < 0 && c != PlayerCtl.I.Car && (c.transform.position - me).sqrMagnitude > 350f * 350f) Destroy(c.gameObject);
+                if (c != null && !c.Traffic && c.OwnedIndex < 0 && c != PlayerCtl.I.Car && c != Taxi.CarOf && (c.transform.position - me).sqrMagnitude > 350f * 350f) Destroy(c.gameObject);
 
             // pedestrians
             for (int i = walkers.Count - 1; i >= 0; i--)

@@ -1,6 +1,31 @@
 // Browser glue for the WebGL build: WebSocket transport for the MQTT relay (Net/WsMqttLink.cs),
 // flushing save files to IndexedDB, and reloading the page.
 mergeInto(LibraryManager.library, {
+  // 0.8: a web page inside the in-game phone (an iframe over the canvas, in canvas fractions)
+  GadFrameShow: function (urlPtr, x, y, w, h) {
+    var url = UTF8ToString(urlPtr);
+    var c = document.querySelector('canvas');
+    var f = document.getElementById('gad-frame');
+    if (!f) {
+      f = document.createElement('iframe');
+      f.id = 'gad-frame';
+      f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
+      f.style.position = 'fixed'; f.style.border = '0'; f.style.zIndex = 50; f.style.background = '#fff';
+      document.body.appendChild(f);
+    }
+    var r = c.getBoundingClientRect();
+    f.style.left = (r.left + x * r.width) + 'px'; f.style.top = (r.top + y * r.height) + 'px';
+    f.style.width = (w * r.width) + 'px'; f.style.height = (h * r.height) + 'px';
+    f.style.display = 'block';
+    if (f.getAttribute('data-url') !== url) { f.setAttribute('data-url', url); f.src = url; }
+  },
+  GadFrameHide: function () {
+    var f = document.getElementById('gad-frame');
+    if (f) f.style.display = 'none';
+  },
+  GadOpenTab: function (urlPtr) {
+    window.open(UTF8ToString(urlPtr), '_blank');
+  },
   GadWsOpen: function (urlPtr) {
     var url = UTF8ToString(urlPtr);
     if (!window.gadWs) window.gadWs = { next: 1, socks: {} };

@@ -63,6 +63,7 @@ namespace Gad
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             Keys();
             if (busy) { }
+            else if (Taxi.Riding) { }
             else if (Car != null) DriveUpdate(dt);
             else if (CC.enabled) WalkUpdate(dt);
             FindAction();
@@ -142,7 +143,14 @@ namespace Gad
             LookDelta = Vector2.zero;
             Vector3 target;
             float want = Dist;
-            if (Car != null)
+            if (Taxi.Riding && Taxi.CarOf != null)
+            {   // 0.8: riding in a taxi: the camera follows the taxi
+                want = Mathf.Max(Dist + 3.5f, 8f);
+                var tc = Taxi.CarOf;
+                target = tc.transform.position + Vector3.up * 1.6f;
+                if (tc.Speed > 3f && !UIRoot.LookActive) Yaw = Mathf.LerpAngle(Yaw, tc.transform.eulerAngles.y, dt * 2.2f);
+            }
+            else if (Car != null)
             {
                 want = Mathf.Max(Dist + 3.5f, 8f);
                 target = Car.transform.position + Vector3.up * 1.6f;
@@ -160,6 +168,7 @@ namespace Gad
             float d = want;
             if (Physics.SphereCast(target, 0.25f, back, out var hit, want, (1 << 10) | (1 << 13) | (1 << 12), QueryTriggerInteraction.Ignore))
                 d = Mathf.Max(0.6f, hit.distance - 0.1f);
+            d = InPlace.ClampCam(target, back, d);
             camDist = d < camDist ? d : Mathf.Lerp(camDist, d, dt * 4f);
             Cam.transform.SetPositionAndRotation(target + back * camDist, rot);
         }
@@ -170,6 +179,7 @@ namespace Gad
         {
             ActionLabel = null; ActionDo = null; CarLabel = null; nearCar = null; nearParked = null;
             if (busy) return;
+            if (Taxi.Riding) { CarLabel = "ВЫЙТИ ИЗ ТАКСИ"; return; }
             if (Car != null) { CarLabel = "ВЫЙТИ"; return; }
             var p = transform.position;
             if (Inside >= 0)
@@ -200,6 +210,7 @@ namespace Gad
         void CarButton()
         {
             if (busy) return;
+            if (Taxi.Riding) { Taxi.I.ExitNow(); return; }
             if (Car != null) { ExitCar(); return; }
             if (nearParked != null) { var c = Streamer.TakeParked(nearParked); if (c != null) EnterCar(c); return; }
             if (nearCar != null) EnterCar(nearCar);

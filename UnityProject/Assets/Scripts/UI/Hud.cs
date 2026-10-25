@@ -13,7 +13,8 @@ namespace Gad
         Image foodBar, energyBar, healthBar, workFill, arrow, mapPlayer, mapTarget;
         RectTransform workBar, gps;
         RawImage minimap;
-        UIButton action, jump, run, carBtn, brake, phone, mapBtn, chatBtn;
+        UIButton action, jump, run, carBtn, brake, phone, mapBtn, chatBtn, gunBtn, fireBtn;
+        Image cross;
         readonly List<(TextMeshProUGUI t, float until)> toasts = new List<(TextMeshProUGUI, float)>();
         RectTransform toastBox, chatBox;
         readonly List<(TextMeshProUGUI t, float at)> chatLines = new List<(TextMeshProUGUI, float)>();
@@ -68,7 +69,11 @@ namespace Gad
             healthBar = Bar(info.transform, "ЗДОРОВЬЕ", 2, new Color(1f, 0.35f, 0.4f));
 
             // top-right buttons + minimap
-            phone = UIKit.Button(t, "ТЕЛЕФОН", UIKit.Violet, () => Menus.Phone(), 26);
+            phone = UIKit.Button(t, "ТЕЛЕФОН", UIKit.Violet, PhoneUI.Toggle, 26);
+            // 0.8: a phone button on the right side as well: the phone opens on half the screen
+            var side = UIKit.Button(t, "ТЕЛЕ-\nФОН", UIKit.Violet, PhoneUI.Toggle, 24);
+            UIKit.Place(side.Bg.rectTransform, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-sr, 40), new Vector2(120, 110));
+            side.Label.textWrappingMode = TextWrappingModes.Normal;
             UIKit.Place(phone.Bg.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-sr, -st), new Vector2(200, 70));
             mapBtn = UIKit.Button(t, "КАРТА", new Color(0.15f, 0.55f, 0.85f), () => Menus.Map(), 26);
             UIKit.Place(mapBtn.Bg.rectTransform, new Vector2(1, 1), new Vector2(1, 1), new Vector2(-sr - 210, -st), new Vector2(160, 70));
@@ -126,6 +131,15 @@ namespace Gad
             UIKit.Place(carBtn.Bg.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-sr - 30, 180), new Vector2(120, 120));
             brake = UIKit.Round(t, "ТОРМОЗ", new Color(0.85f, 0.2f, 0.2f, 0.9f), null, 160, 26);
             UIKit.Place(brake.Bg.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-sr - 30, 40), new Vector2(170, 170));
+
+            // 0.8: the pistol: take out / put away, fire, and a crosshair in the middle
+            gunBtn = UIKit.Round(t, "ПИСТОЛЕТ", new Color(0.3f, 0.3f, 0.35f, 0.9f), Guns.Toggle, 120, 20);
+            UIKit.Place(gunBtn.Bg.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-sr - 370, 40), new Vector2(120, 120));
+            fireBtn = UIKit.Round(t, "ОГОНЬ", new Color(0.85f, 0.25f, 0.15f, 0.92f), Guns.Fire, 150, 26);
+            fireBtn.FireOnDown = true;
+            UIKit.Place(fireBtn.Bg.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-sr - 210, 190), new Vector2(150, 150));
+            cross = UIKit.Img(t, UIKit.Ring, new Color(1, 1, 1, 0.85f), "Cross");
+            UIKit.Place(cross.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 60), new Vector2(34, 34));
 
             fade = UIKit.Img(UIRoot.TopLayer, UIKit.White, new Color(0, 0, 0, 0), "Fade");
             UIKit.Fill(fade.rectTransform);
@@ -204,6 +218,11 @@ namespace Gad
             jump.gameObject.SetActive(!driving);
             run.gameObject.SetActive(!driving);
             brake.gameObject.SetActive(driving);
+            bool riding = Taxi.Riding;
+            gunBtn.gameObject.SetActive(Save.D.guns.Count > 0 && !driving && !riding);
+            gunBtn.Bg.color = Guns.Armed ? new Color(0.85f, 0.55f, 0.15f, 0.95f) : new Color(0.3f, 0.3f, 0.35f, 0.9f);
+            fireBtn.gameObject.SetActive(Guns.Armed && !driving && !riding && UIRoot.Open == null);
+            cross.gameObject.SetActive(Guns.Armed && !driving && !riding);
             pl.BrakeHeld = driving && brake.Held;
             run.Bg.color = pl.RunHeld ? new Color(0.95f, 0.55f, 0.1f, 0.95f) : new Color(0.15f, 0.2f, 0.35f, 0.85f);
 
