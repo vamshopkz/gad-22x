@@ -166,6 +166,7 @@ namespace Gad
             Fixed.TryGetValue((bx, bz), out var fx);
             bool hasFixed = Fixed.ContainsKey((bx, bz));
 
+            if (d == District.Park && Landmarks.Is(Landmarks.LakeBlock, bx, bz)) return;   // 1.0: «Озеро и пристань»
             if (d == District.Park)
             {
                 // one café pavilion in the park
@@ -247,14 +248,14 @@ namespace Gad
                     case BType.Station:
                         fp = Shrink(lot, front, 4, 4f, new Vector2(50, 24)); h = 14f; style = 8; break;
                     case BType.Port:
-                        fp = Shrink(lot, front, 4, 4f, new Vector2(30, 20)); h = 10f; style = 5; break;
+                        fp = Shrink(lot, front, 4, 4f, new Vector2(36, 24)); h = 10f; style = 5; break;
                     case BType.Factory: case BType.Warehouse:
                         fp = Shrink(lot, front, set, 1.5f, new Vector2(r.F(36, 52), r.F(20, 24)));
                         h = r.F(9, 14); style = 5; break;
                     case BType.GasStation:
-                        fp = Shrink(lot, front, 2, 14f, new Vector2(12, 9)); h = 4.2f; style = 4; break;
+                        fp = Shrink(lot, front, 2, 14f, new Vector2(15.5f, 13.5f)); h = 4.6f; style = 4; break;   // 1.0: room for its shop inside
                     case BType.Garage:
-                        fp = Shrink(lot, front, 2, 3f, new Vector2(r.F(16, 22), r.F(12, 16))); h = 6f; style = 5; break;
+                        fp = Shrink(lot, front, 2, 3f, new Vector2(22f, 17.5f)); h = 6.4f; style = 5; break;
                     case BType.Parking:
                         fp = Shrink(lot, front, 2, 2f, new Vector2(22, 20)); h = 12.4f; style = 3; break;   // 0.9: an open multi-storey car park
                     case BType.Hotel:
@@ -270,6 +271,29 @@ namespace Gad
                         h = d == District.Beach ? 4.4f : 3.3f * (1 + r.I(4)) + 4.4f; style = 4; break;
                 }
                 int floors = Mathf.Max(1, Mathf.RoundToInt(h / 3.3f));
+                // 1.0: the modules from the planning boards
+                string special = null;
+                if (Landmarks.Is(Landmarks.GlobeBlock, bx, bz))
+                {
+                    t = BType.Office; fp = Shrink(lot, front, 2f, 2f, new Vector2(22, 22)); h = 22f + li * 3f; style = li % 2 == 0 ? 0 : 7;
+                    special = Landmarks.Globe + " · корпус " + "АБВГ"[li];
+                }
+                else if (Landmarks.Is(Landmarks.MixedBlock, bx, bz))
+                {
+                    t = BType.Apartment; fp = Shrink(lot, front, 2f, 1.5f, new Vector2(22, 16)); h = 3.3f * (10 + li % 3) + 4f; style = li % 2 == 0 ? 1 : 2;
+                    special = "Микст-квартал, корпус " + (li + 1);
+                }
+                else if (Landmarks.Is(Landmarks.LogisticsBlock, bx, bz))
+                {
+                    t = BType.Warehouse; fp = Shrink(new Rect(lot.xMin, lot.yMin, lot.width - 20f, lot.height), front, 0.5f, 1.5f, new Vector2(40, 22)); h = 12f; style = 5;
+                    special = li == 0 ? Landmarks.Logistics : Landmarks.Logistics + " · склад 2";
+                }
+                else if (Landmarks.Is(Landmarks.HotelsBlock, bx, bz) && li < 2)
+                {
+                    t = BType.Hotel; fp = Shrink(lot, front, 2f, 1.5f, new Vector2(24, 20)); h = 3.3f * (9 + li * 3); style = li == 0 ? 8 : 3;
+                    special = li == 0 ? "Отель «Маршрут»" : "Отель «Узел»";
+                }
+                if (special != null) floors = Mathf.Max(1, Mathf.RoundToInt(h / 3.3f));
                 // 0.7: building plots in the suburbs (18 of them) where players build their own houses
                 if (d == District.Suburb && IsPlot(bx, bz, li) && !(hasFixed && li == 0))
                 {
@@ -277,6 +301,8 @@ namespace Gad
                     fp = new Rect(lot.xMin + 0.3f, lot.yMin + 0.3f, lot.width - 0.6f, lot.height - 0.6f);
                 }
                 Add(bx, bz, t, d, fp, front, h, floors, style, r);
+                if (special != null) All[All.Count - 1].name = special;
+                if (t == BType.Station && Landmarks.Is(Landmarks.HubBlock, bx, bz)) All[All.Count - 1].name = Landmarks.Hub + " «Центральный вокзал»";
             }
         }
 

@@ -169,6 +169,22 @@ namespace Gad
             m.Flat(WorldBuilder.Asphalt, road.x - 12, road.z - 10, road.x + 12, road.z + 10, 0.012f, 8f);
         }
 
+        /// <summary>The nearest point on any road (city grid or the roads out of town) to a point on the map.</summary>
+        public static Vector3 NearestRoad(Vector3 p)
+        {
+            var best = City.NearestRoad(new Vector3(Mathf.Clamp(p.x, 0, City.Size), 0, Mathf.Clamp(p.z, 0, City.Size)), out _);
+            float bd = Vector2.Distance(new Vector2(best.x, best.z), new Vector2(p.x, p.z));
+            foreach (var r in All)
+                foreach (var q in r.pts)
+                {
+                    float d = Vector2.Distance(new Vector2(q.x, q.z), new Vector2(p.x, p.z));
+                    if (d < bd) { bd = d; best = q; }
+                }
+            // inside the city a point between the streets goes to the street beside it
+            if (p.x > 0 && p.x < City.Size && p.z > 0 && p.z < City.Size) best = City.NearestRoad(p, out _);
+            return new Vector3(best.x, 0.05f, best.z);
+        }
+
         /// <summary>For the taxi: if the destination is out along one of these roads, the way there from the city edge.</summary>
         public static List<Vector3> TailTo(Vector3 target)
         {

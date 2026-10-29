@@ -21,7 +21,23 @@ namespace Gad
         {
             dir = Boot.Arg("-shots") ?? Path.Combine(Application.persistentDataPath, "shots");
             Directory.CreateDirectory(dir);
-            StartCoroutine(Multiplayer ? Mp() : Boot.Has("-homes") ? Homes() : Boot.Has("-shop") ? ShopLook() : Run());
+            StartCoroutine(Multiplayer ? Mp() : Boot.Has("-homes") ? Homes() : Boot.Has("-shop") ? ShopLook() : Boot.Has("-house") ? HouseLook() : Run());
+        }
+
+        IEnumerator HouseLook()
+        {
+            var pl = PlayerCtl.I;
+            yield return Wait(2f);
+            var hb2 = City.Nearest(BType.House, City.Spawn);
+            var dirIn = -hb2.FrontDir;
+            pl.Teleport(hb2.door - dirIn * 5f + Vector3.up * 0.2f, Mathf.Atan2(dirIn.x, dirIn.z) * Mathf.Rad2Deg);
+            for (int i = 0; i < 6; i++)
+            {
+                yield return Wait(0.5f);
+                Debug.Log($"[HouseLook] t={i * 0.5f} inside={(HouseWorld.InsideOf(hb2) != null)} player={pl.transform.position} house={hb2.rect} hw={(HouseWorld.I != null)} hwActive={(HouseWorld.I != null && HouseWorld.I.isActiveAndEnabled)}");
+            }
+            yield return Shot("h1");
+            Finish();
         }
 
         /// <summary>Quick look at a walk-in shop: free camera inside and outside, and a log of where things are.</summary>
@@ -197,11 +213,25 @@ namespace Gad
                 pl.Teleport(flats.door + flats.FrontDir * 1.5f, 0); yield return Wait(0.5f);
                 Interiors.Enter(flats, 0); yield return Wait(0.5f);
                 Interiors.BuildLevel(4);
-                pl.Teleport(Interiors.O + new Vector3(Interiors.EX - 14f, 4 * Elevator.FH + 0.1f, Interiors.EZ - 2f), 270);
+                pl.Teleport(Interiors.ToWorld(new Vector3(Interiors.EX - 14f, 4 * Elevator.FH + 0.1f, Interiors.EZ - 2f)), Interiors.Yaw(270));
                 pl.Yaw = 270; pl.Pitch = 5; pl.Dist = 3f;
                 yield return Wait(1.0f); yield return Shot("84_view_from_flat");
                 Interiors.Exit(); yield return null;
                 pl.Dist = 5.2f;
+            }
+
+            // 1.0: the city modules from the planning boards, seen from above
+            {
+                Check("модули города с названиями", Landmarks.All.Count >= 7, Landmarks.All.Count + " шт.");
+                int k = 0;
+                foreach (var mk in Landmarks.All)
+                {
+                    pl.Teleport(mk.pos + Vector3.up * 0.3f, 0); yield return Wait(1.6f);
+                    PlayerCtl.ShotCam = true;
+                    PlayerCtl.ShotPos = mk.pos + new Vector3(-36f, 34f, -36f); PlayerCtl.ShotLook = mk.pos + new Vector3(18f, 0f, 18f);
+                    yield return Wait(0.6f); yield return Shot($"9{k++}_module");
+                }
+                PlayerCtl.ShotCam = false;
             }
 
             // 0.8: gun shop, office towers with your own computer
@@ -233,7 +263,7 @@ namespace Gad
                     Interiors.Enter(corp); yield return Wait(0.5f);
                     Save.D.offices.Add(corp.id * 1000 + 7);
                     Interiors.BuildLevel(7);
-                    pl.Teleport(Interiors.O + new Vector3(Interiors.EX, 7 * Elevator.FH + 0.1f, Interiors.EZ - 4f), 180);
+                    pl.Teleport(Interiors.ToWorld(new Vector3(Interiors.EX, 7 * Elevator.FH + 0.1f, Interiors.EZ - 4f)), Interiors.Yaw(180));
                     yield return Wait(0.8f);
                     Check("свой офис с компьютером", Interiors.Points.Exists(p => p.Label == "МОЙ КОМПЬЮТЕР"));
                     yield return Shot("75_my_office");
@@ -340,11 +370,11 @@ namespace Gad
             var ap = City.Nearest(BType.Apartment, pl.transform.position);
             Interiors.Enter(ap);
             yield return Wait(0.5f);
-            pl.Teleport(Interiors.O + new Vector3(Interiors.EX, 0.1f, Interiors.EZ - 3.2f), 0);
+            pl.Teleport(Interiors.ToWorld(new Vector3(Interiors.EX, 0.1f, Interiors.EZ - 3.2f)), Interiors.Yaw(0));
             pl.Yaw = 0; pl.Pitch = 8;
             yield return Wait(1.6f);
             yield return Shot("21_lift_open");
-            pl.Teleport(Interiors.O + new Vector3(Interiors.EX, 0.1f, Interiors.EZ), 180);
+            pl.Teleport(Interiors.ToWorld(new Vector3(Interiors.EX, 0.1f, Interiors.EZ)), Interiors.Yaw(180));
             yield return Wait(0.3f);
             var lift = Elevator.I;
             Check("лифт есть и игрок в кабине", lift != null && lift.PlayerInside);
@@ -360,7 +390,7 @@ namespace Gad
                 float tl = Time.realtimeSinceStartup;
                 while (lift.Riding && Time.realtimeSinceStartup - tl < 10f) yield return null;
                 Check("лифт приехал на 3 этаж", Interiors.Floor == 2 && !lift.Riding);
-                pl.Teleport(Interiors.O + new Vector3(Interiors.EX, 2 * Elevator.FH + 0.1f, Interiors.EZ - 2.8f), 180);
+                pl.Teleport(Interiors.ToWorld(new Vector3(Interiors.EX, 2 * Elevator.FH + 0.1f, Interiors.EZ - 2.8f)), Interiors.Yaw(180));
                 pl.Yaw = 150; pl.Pitch = 12; pl.Dist = 4;
                 yield return Wait(1.2f);
                 yield return Shot("23_corridor_5_flats");
@@ -376,7 +406,7 @@ namespace Gad
                     Eco.Home(ap.id, sale).decor.AddRange(new[] { "sofa:3", "tv:0", "plant:4", "rug:2", "lamp:5", "art:6", "table:9", "pc:6" });
                     Interiors.BuildLevel(2);
                     float xk = Interiors.EX + ((sale % 10) - 3) * 7f;
-                    pl.Teleport(Interiors.O + new Vector3(xk, 2 * Elevator.FH + 0.1f, Interiors.EZ - 4.6f - 1.2f), 180);
+                    pl.Teleport(Interiors.ToWorld(new Vector3(xk, 2 * Elevator.FH + 0.1f, Interiors.EZ - 4.6f - 1.2f)), Interiors.Yaw(180));
                     pl.Yaw = 200; pl.Dist = 3.5f;
                     yield return Wait(1.0f);
                     yield return Shot("24_my_flat");
@@ -406,12 +436,12 @@ namespace Gad
                 yield return Wait(1.0f);
                 yield return Shot("26_agency_lobby");
                 Check("лифт агентства на 20 этажей", Interiors.TopFloor(agb) == 19);
-                pl.Teleport(Interiors.O + new Vector3(Interiors.EX, 0.1f, Interiors.EZ), 180);
+                pl.Teleport(Interiors.ToWorld(new Vector3(Interiors.EX, 0.1f, Interiors.EZ)), Interiors.Yaw(180));
                 yield return Wait(0.2f);
                 Elevator.I.Go(19);
                 float ta = Time.realtimeSinceStartup;
                 while (Elevator.I.Riding && Time.realtimeSinceStartup - ta < 12f) yield return null;
-                pl.Teleport(Interiors.O + new Vector3(Interiors.EX, 19 * Elevator.FH + 0.1f, Interiors.EZ - 4f), 180);
+                pl.Teleport(Interiors.ToWorld(new Vector3(Interiors.EX, 19 * Elevator.FH + 0.1f, Interiors.EZ - 4f)), Interiors.Yaw(180));
                 pl.Yaw = 180; pl.Dist = 6;
                 yield return Wait(1.0f);
                 yield return Shot("27_sky_lounge");

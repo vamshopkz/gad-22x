@@ -580,12 +580,21 @@ namespace Gad
 
         // ------------------------------------------------------------------ colliders
 
+        public static readonly Dictionary<int, GameObject> BuildingCols = new Dictionary<int, GameObject>();
+        static GameObject cityCols;
+
+        /// <summary>On the upper floors of a building (whose rooms may reach past its outline) the city's building walls are off.</summary>
+        public static void SetCityColliders(bool on) { if (cityCols != null) cityCols.SetActive(on); }
+
+        public static void SetBuildingWalls(Bld b, bool on) { if (BuildingCols.TryGetValue(b.id, out var g) && g != null) g.SetActive(on); }
+
         static void Colliders()
         {
             var go = new GameObject("Colliders");
             go.transform.SetParent(Root, false);
             var bgo = new GameObject("Building colliders") { layer = 10 };
             bgo.transform.SetParent(go.transform, false);
+            cityCols = bgo;
             var ggo = new GameObject("Ground colliders") { layer = 13 };
             ggo.transform.SetParent(go.transform, false);
 
@@ -609,18 +618,32 @@ namespace Gad
                 if (HouseWorld.IsReal(b)) continue;   // their own colliders come with the close-up house
                 float h = b.height + (b.type == BType.House ? 2.3f : 0.7f);
                 if (InPlace.Eligible(b))
-                {   // 0.8: a walk-in shop: walls round the ground floor with the door free, the floors above solid
+                {   // a building entered for real: walls round it with the door free; above the ground floor
+                    // solid, except buildings with a lift, whose floors are built inside at their real height
+                    var grp = new GameObject("Walls " + b.id) { layer = 10 };
+                    grp.transform.SetParent(bgo.transform, false);
+                    BuildingCols[b.id] = grp;
                     var r = b.rect; float g = Mathf.Min(b.height, InPlace.GroundOf(b)), y1 = City.Curb + g;
-                    if (b.height > g) Bx(bgo, new Vector3(r.xMin, y1, r.yMin), new Vector3(r.xMax, City.Curb + h, r.yMax));
+                    bool lift = Interiors.HasLift(b);
+                    float top = lift ? City.Curb + h : y1;
+                    if (!lift && b.height > g) Bx(grp, new Vector3(r.xMin, y1, r.yMin), new Vector3(r.xMax, City.Curb + h, r.yMax));
+                    if (lift) Bx(grp, new Vector3(r.xMin, City.Curb + h - 0.4f, r.yMin), new Vector3(r.xMax, City.Curb + h, r.yMax));
                     const float t = 0.25f;
                     var d = b.door;
                     Vector3 A(float x, float z) => new Vector3(x, 0, z);
-                    void Wall(Vector3 a, Vector3 c) => Bx(bgo, new Vector3(Mathf.Min(a.x, c.x), 0, Mathf.Min(a.z, c.z)), new Vector3(Mathf.Max(a.x, c.x), y1, Mathf.Max(a.z, c.z)));
+                    void Wall(Vector3 a, Vector3 c) => Bx(grp, new Vector3(Mathf.Min(a.x, c.x), 0, Mathf.Min(a.z, c.z)), new Vector3(Mathf.Max(a.x, c.x), top, Mathf.Max(a.z, c.z)));
                     // south, north, west, east; the front one in two pieces either side of the door
                     if (b.front == 0) { Wall(A(r.xMin, r.yMin), A(d.x - 1.3f, r.yMin + t)); Wall(A(d.x + 1.3f, r.yMin), A(r.xMax, r.yMin + t)); } else Wall(A(r.xMin, r.yMin), A(r.xMax, r.yMin + t));
                     if (b.front == 1) { Wall(A(r.xMin, r.yMax - t), A(d.x - 1.3f, r.yMax)); Wall(A(d.x + 1.3f, r.yMax - t), A(r.xMax, r.yMax)); } else Wall(A(r.xMin, r.yMax - t), A(r.xMax, r.yMax));
                     if (b.front == 2) { Wall(A(r.xMin, r.yMin), A(r.xMin + t, d.z - 1.3f)); Wall(A(r.xMin, d.z + 1.3f), A(r.xMin + t, r.yMax)); } else Wall(A(r.xMin, r.yMin), A(r.xMin + t, r.yMax));
                     if (b.front == 3) { Wall(A(r.xMax - t, r.yMin), A(r.xMax, d.z - 1.3f)); Wall(A(r.xMax - t, d.z + 1.3f), A(r.xMax, r.yMax)); } else Wall(A(r.xMax - t, r.yMin), A(r.xMax, r.yMax));
+                    if (b.type == BType.GasStation)
+                    {
+                        float fz = b.front == 0 ? b.rect.yMin - 13 : b.rect.yMax + 3;
+                        foreach (float px in new[] { b.rect.xMin + 1, b.rect.xMax - 1 })
+                            foreach (float pz in new[] { fz + 2, fz + 8 })
+                                Bx(bgo, new Vector3(px - 0.25f, 0, pz - 0.25f), new Vector3(px + 0.25f, 5, pz + 0.25f));
+                    }
                     continue;
                 }
                 Bx(bgo, new Vector3(b.rect.xMin, 0, b.rect.yMin), new Vector3(b.rect.xMax, City.Curb + h, b.rect.yMax));
@@ -660,6 +683,8 @@ namespace Gad
             Airport(m);
             Palms(m);
             OutRoads.Build(m);   // 0.9: roads that bend and lead to the lake and the lighthouse
+            Landmarks.Build(m);  // 1.0: the modules from the planning boards
+            Landmarks.Signs(Root);
             m.Build("Outskirts", Root, 13, true);
             Mountains();
         }

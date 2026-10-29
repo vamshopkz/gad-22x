@@ -448,6 +448,7 @@ namespace Gad
             int price = from == null ? 60 : from.type == BType.Airport ? 200 : 80;
             Window.Show(from == null ? "ТАКСИ" : "БИЛЕТЫ", w =>
             {
+                if (from == null) w.Row("Любая точка на карте", "Выберите место на карте — хоть на дороге", "КАРТА", Blue, Map);
                 w.Text(from == null ? "Куда поедем? Такси приедет к вам, оплата за весь путь сразу — если выйдете раньше, остаток вернём." : "Куда отправимся? Цена " + Hud.Money(price), 26, UIKit.Muted);
                 (string name, System.Func<Bld> where)[] dest =
                 {
@@ -458,7 +459,12 @@ namespace Gad
                     ("Морской порт", () => City.Nearest(BType.Port, Vector3.zero)),
                     ("Пляж", () => City.All.Find(x => x.name.Contains("Пляжный бар"))),
                     ("Горы (ресторан «Перевал»)", () => City.All.Find(x => x.name.Contains("Перевал"))),
-                    ("Озеро", () => City.All.Find(x => x.name.Contains("Озеро"))),
+                    ("Озеро", () => City.All.Find(x => x.name.Contains("Кафе «Озеро»"))),
+                    ("Бизнес-парк «Глобаль»", () => City.All.Find(x => x.name.StartsWith(Landmarks.Globe))),
+                    ("Высотный микст-квартал", () => City.All.Find(x => x.name.StartsWith("Микст-квартал"))),
+                    ("Логистический центр", () => City.All.Find(x => x.name.StartsWith(Landmarks.Logistics))),
+                    ("Мультимодальный хаб", () => City.All.Find(x => x.name.StartsWith(Landmarks.Hub))),
+                    ("Маршрутный узел и отели", () => City.All.Find(x => x.name == "Отель «Маршрут»")),
                     ("Маяк", () => City.All.Find(x => x.name.Contains("Маяк"))),
                     ("Торговый центр", () => City.Nearest(BType.Mall, PlayerCtl.I.transform.position)),
                     ("Автосалон", () => City.Nearest(BType.CarDealer, PlayerCtl.I.transform.position)),
@@ -501,12 +507,22 @@ namespace Gad
                 host.gameObject.AddComponent<LayoutElement>().minHeight = 560;
                 var raw = UIKit.Rect("Map", host.transform).gameObject.AddComponent<RawImage>();
                 raw.texture = MapTex.Get();
+                raw.raycastTarget = true;
+                raw.gameObject.AddComponent<MapPick>();   // 1.0: tap anywhere on the map to send a taxi there
                 UIKit.Place(raw.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(14, 0), new Vector2(540, 540));
                 var pl = PlayerCtl.I;
                 var me = pl.Inside >= 0 ? City.Get(pl.Inside).door : pl.transform.position;
                 var uv = MapTex.UV(me);
                 var dot = UIKit.Img(raw.transform, UIKit.Circle, UIKit.Cyan, "Me");
                 UIKit.Place(dot.rectTransform, Vector2.zero, new Vector2(0.5f, 0.5f), new Vector2(uv.x * 540, uv.y * 540), new Vector2(20, 20));
+                // 1.0: the names of the city's modules, as on the planning boards
+                foreach (var mk in Landmarks.All)
+                {
+                    var luv = MapTex.UV(mk.pos);
+                    var lt = UIKit.Txt(raw.transform, mk.name, 13, mk.color, TMPro.TextAlignmentOptions.Center, true);
+                    UIKit.Place(lt.rectTransform, Vector2.zero, new Vector2(0.5f, 0.5f), new Vector2(luv.x * 540, luv.y * 540 + 10), new Vector2(150, 22));
+                    lt.raycastTarget = false;
+                }
                 foreach (var r in WorldNet.Remotes.Values)
                 {
                     var ruv = MapTex.UV(r.WorldPos);
@@ -523,6 +539,7 @@ namespace Gad
                 legend.richText = true;
                 UIKit.Place(legend.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(574, -14), new Vector2(460, 200));
 
+                w.Text("Нажмите на карту в любом месте (можно прямо на дорогу) — такси приедет и отвезёт туда.", 24, UIKit.Gold);
                 w.Text("Проложить маршрут (GPS):", 26, UIKit.Cyan);
                 (string, BType)[] places =
                 {
@@ -541,6 +558,20 @@ namespace Gad
                     w.Row(name, b.name + " · " + Mathf.RoundToInt(dist) + " м", "МАРШРУТ", Blue, () => { Hud.SetGps(b.door, b.name); Window.Close(); }, true, MapTex.Cat(t));
                 }
             }, 1200, 840);
+        }
+
+        /// <summary>1.0: a taxi to any point (picked on the map; it is moved onto the nearest road).</summary>
+        public static void TaxiTo(Vector3 point)
+        {
+            var dest = OutRoads.NearestRoad(point);
+            long fare = Taxi.FareTo(dest);
+            Hud.SetGps(dest, "Точка на карте");
+            Window.Show("ТАКСИ В ТОЧКУ НА КАРТЕ", w =>
+            {
+                w.Text("Такси приедет к вам и отвезёт в выбранную точку (на ближайшую дорогу). Выйти можно в любой момент — остаток вернём.", 24, UIKit.Muted);
+                w.Row("Поехали", $"Примерно {Mathf.RoundToInt(Vector3.Distance(PlayerCtl.I.transform.position, dest))} м · {Hud.Money(fare)}", "ВЫЗВАТЬ", Green, () => { Window.Close(); Taxi.Order(dest, "Точка на карте"); }, Save.D.money >= fare);
+                w.Row("Другая точка", "Вернуться к карте", "КАРТА", Blue, Map);
+            }, 900, 520);
         }
 
         public static void Chat()
@@ -780,6 +811,23 @@ namespace Gad
                 Interiors.Build(Interiors.Current, h.unit);
                 PlayerCtl.I.Teleport(pos, PlayerCtl.I.transform.eulerAngles.y);
             }
+        }
+    }
+}
+
+namespace Gad
+{
+    /// <summary>1.0: tapping the map picks a point for the taxi.</summary>
+    public class MapPick : UnityEngine.MonoBehaviour, UnityEngine.EventSystems.IPointerClickHandler
+    {
+        public void OnPointerClick(UnityEngine.EventSystems.PointerEventData e)
+        {
+            var rt = (UnityEngine.RectTransform)transform;
+            if (!UnityEngine.RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, e.position, e.pressEventCamera, out var lp)) return;
+            var r = rt.rect;
+            float u = (lp.x - r.xMin) / r.width, v = (lp.y - r.yMin) / r.height;
+            var world = new UnityEngine.Vector3(MapTex.X0 + u * MapTex.Span, 0f, MapTex.Z0 + v * MapTex.Span);
+            Menus.TaxiTo(world);
         }
     }
 }

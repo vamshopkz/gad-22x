@@ -302,7 +302,7 @@ namespace Gad
     /// <summary>The city map as a texture (minimap, full map window).</summary>
     public static class MapTex
     {
-        public const float X0 = -260, Z0 = -260, Span = 2300;
+        public const float X0 = -1060, Z0 = -420, Span = 3200;   // the city, the lake in the west, the lighthouse and the airport
         static Texture2D tex;
 
         public static Vector2 UV(Vector3 p) => new Vector2((p.x - X0) / Span, (p.z - Z0) / Span);
@@ -310,7 +310,7 @@ namespace Gad
         public static Texture2D Get()
         {
             if (tex != null) return tex;
-            const int S = 576;
+            const int S = 800;
             tex = new Texture2D(S, S, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "Map" };
             var px = new Color32[S * S];
             float m = Span / S;
@@ -340,6 +340,25 @@ namespace Gad
                     if (wz > 7 * City.P - City.Road && wz < 7 * City.P + City.Road && wx > City.Size && wx < City.AirportX0 + 74) c = road;
                     if (wx > City.AirportX0 + 20 && wx < City.AirportX1 - 20 && wz > City.AirportZ1 - 90 && wz < City.AirportZ1 - 40) c = road;
                     px[y * S + x] = c;
+                }
+            // the lake and the roads out of town
+            var lc = OutRoads.LakeCentre;
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float wx = X0 + x * m, wz = Z0 + y * m;
+                    float dl = Vector2.Distance(new Vector2(wx, wz), new Vector2(lc.x, lc.z));
+                    if (dl < 175f) px[y * S + x] = sea; else if (dl < 188f) px[y * S + x] = sand;
+                }
+            foreach (var r in OutRoads.All)
+                foreach (var p in r.pts)
+                {
+                    int cx = (int)((p.x - X0) / m), cz = (int)((p.z - Z0) / m);
+                    for (int dy = -2; dy <= 2; dy++) for (int dx = -2; dx <= 2; dx++)
+                    {
+                        int xx = cx + dx, yy = cz + dy;
+                        if (xx >= 0 && yy >= 0 && xx < S && yy < S) px[yy * S + xx] = road;
+                    }
                 }
             foreach (var b in City.All)
             {

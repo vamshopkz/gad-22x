@@ -143,10 +143,35 @@ Shader "Gad/FacadeInterior"
                 float h1 = Hash(cell + 0.37), h2 = Hash(cell * 1.7 + 4.1);
                 // one kind of room per facade (a uniform branch: cheap), mirrored at random per window
                 half3 room = Room(f, rd, _RoomKind, _RoomDepth, frac(h1 * 7.3) > 0.5 ? 1 : -1);
-                half lit = step(1 - _LitRate, h2);
+                float h3 = Hash(cell * 2.3 + 9.7), h4 = Hash(cell * 3.1 + 1.3);
+                float tm = _Time.y;
+                // 1.0: life in the rooms. Lights go on and off over the evening (every room on its own clock)
+                half lit = step(1 - _LitRate, frac(h2 + floor(tm / (70 + h1 * 160) + h3) * 0.618));
                 half night = saturate(_GadNight);
+                // somebody walks across some rooms: a dark figure against the lit back of the room
+                if (h4 < 0.28)
+                {
+                    float zp = 0.55 * _RoomDepth;                       // the figure walks half way into the room
+                    float tz = zp / max(-rd.z, 1e-3);
+                    float2 q = f + rd.xy * tz;
+                    float px = frac(tm * (0.03 + h3 * 0.04) + h1);
+                    px = abs(px * 2 - 1) * 1.2 - 0.1;                   // back and forth across the room
+                    float dx = (q.x - px) / 0.07, body = (q.y - 0.27) / 0.24, head = length(float2(q.x - px, (q.y - 0.58) * 0.8)) / 0.06;
+                    half fig = saturate(1 - max(abs(dx), abs(body))) * step(abs(body), 1) * step(abs(dx), 1);
+                    fig = max(fig, step(head, 1));
+                    room = lerp(room, room * 0.12, fig * 0.85);
+                }
                 half bright = lerp(_DayRoom, lerp(0.06, 1.35, lit), night);
                 half3 roomCol = room * bright * lerp(half3(1, 1, 1), half3(1.1, 0.92, 0.7), night * lit);
+                // a television flickering blue in a few dark rooms at night
+                half tv = step(h3, 0.12) * (1 - lit) * night;
+                roomCol += tv * half3(0.15, 0.25, 0.6) * (0.6 + 0.4 * sin(tm * 11 + h1 * 40) * sin(tm * 4.3 + h2 * 20));
+                // curtains: a panel each side of most windows, in its own colour, with soft folds
+                half cl = h1 < 0.75 ? 0.08 + 0.22 * h2 : 0, cr = h1 < 0.75 ? 0.08 + 0.22 * h4 : 0;
+                half curtain = step(f.x, cl) + step(1 - cr, f.x);
+                half3 cloth = lerp(half3(0.85, 0.8, 0.7), half3(0.55 + 0.4 * h3, 0.35 + 0.4 * h4, 0.3 + 0.5 * h2), step(0.5, h3));
+                cloth *= 0.82 + 0.18 * sin(f.x * 90 + h1 * 10);
+                roomCol = lerp(roomCol, cloth * lerp(_DayRoom * 1.1, lerp(0.05, 1.0, lit), night), saturate(curtain));
 
                 InputData inputData = (InputData)0;
                 inputData.positionWS = i.positionWS;

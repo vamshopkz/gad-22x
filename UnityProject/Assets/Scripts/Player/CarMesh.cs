@@ -647,6 +647,37 @@ namespace Gad
                     }
                     body.Add(Human.Tube(null, gap, 0.004f, 4), Matrix4x4.identity, Gloss);
                 }
+                // 1.0: more detail — a black trim round the wheel arches, an orange side repeater on the
+                // front wing, the fuel flap on the right rear wing, a rubber strip along the bottom of the windows
+                foreach (float az in new[] { s.FrontAxle, s.RearAxle })
+                {
+                    var arch = new List<Vector3>();
+                    for (int k = 0; k <= 12; k++)
+                    {
+                        float a = Mathf.Lerp(-10f, 190f, k / 12f) * Mathf.Deg2Rad;
+                        float z = az + Mathf.Cos(a) * (s.R + 0.06f), y = s.R + Mathf.Sin(a) * (s.R + 0.06f);
+                        arch.Add(new Vector3(sx * (p.Half(z) + 0.01f), y, z));
+                    }
+                    body.Add(Human.Tube(null, arch, 0.022f, 5), Matrix4x4.identity, Matte);
+                }
+                float rz = s.FrontAxle - s.R - 0.25f;
+                body.Box(TailL, new Vector3(sx * (p.Half(rz) + 0.006f), s.R + 0.32f, rz), new Vector3(0.01f, 0.025f, 0.08f));
+                if (sx > 0 && !s.Bed)
+                {
+                    float fz = s.RearAxle + s.R + 0.35f, fy = p.Belt(fz) - 0.18f;
+                    body.Cyl(Gloss, new Vector3(p.Half(fz) + 0.004f, fy, fz), new Vector3(0.16f, 0.005f, 0.16f), Quaternion.Euler(0, 0, 90));
+                }
+                float wz0 = s.ZA - 0.1f, wz1 = s.Bed ? s.ZD + 0.1f : s.ZD + 0.15f;
+                var strip = new List<Vector3>();
+                for (int k = 0; k <= 16; k++) { float z = Mathf.Lerp(wz0, wz1, k / 16f); strip.Add(new Vector3(sx * (p.Half(z) * 0.985f + 0.006f), p.Belt(z) + 0.012f, z)); }
+                body.Add(Human.Tube(null, strip, 0.012f, 4), Matrix4x4.identity, Gloss);
+            }
+            // fog lights low in the front bumper and a third reflector strip at the back
+            float fy0 = s.NoseBottom + 0.16f;
+            foreach (float sx in new[] { -1f, 1f })
+            {
+                float fx = sx * s.W * 0.34f;
+                body.Cyl(HeadL, new Vector3(fx, fy0, FrontAt(p, fx, fy0, true) + 0.01f), new Vector3(0.09f, 0.01f, 0.09f), Quaternion.Euler(90, 0, 0));
             }
         }
 

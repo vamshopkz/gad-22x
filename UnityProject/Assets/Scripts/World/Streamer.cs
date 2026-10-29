@@ -310,7 +310,7 @@ namespace Gad
             }
 
             // inside the block
-            if (d == District.Park) Park(m, rng, X0, Z0, go);
+            if (d == District.Park && !Landmarks.Is(Landmarks.LakeBlock, bx, bz)) Park(m, rng, X0, Z0, go);
             foreach (var b in City.ByChunk[bx, bz])
             {
                 if (b.type == BType.Mall || b.type == BType.Apartment) CarPark(m, b);

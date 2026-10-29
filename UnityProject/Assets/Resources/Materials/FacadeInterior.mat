@@ -45,6 +45,7 @@ Material:
     - _DayRoom: 0.42
     - _LitRate: 0.45
     - _RoomDepth: 1.1
+    - _RoomKind: 0
     - _WallSmooth: 0.3
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}

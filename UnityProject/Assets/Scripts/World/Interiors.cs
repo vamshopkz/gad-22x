@@ -59,6 +59,14 @@ namespace Gad
                 InPlace.EnterNow(b);
                 return;
             }
+            if (unit > 0 && HasLift(b) && InPlace.I != null && InPlace.Eligible(b))
+            {
+                if (Root != null && !inPlaceActive) { Clear(); pl.Inside = -1; Streamer.SetOutdoor(true); }
+                InPlace.EnterNow(b);
+                BuildLevel(unit);
+                pl.Teleport(ToWorld(new Vector3(EX, unit * Elevator.FH + 0.1f, EZ - 2.6f)), Root.eulerAngles.y + 180f);
+                return;
+            }
             if (pl.Inside < 0) { Save.D.px = pl.transform.position.x; Save.D.py = pl.transform.position.y; Save.D.pz = pl.transform.position.z; }
             Build(b, unit);
             pl.Inside = b.id;
@@ -85,6 +93,7 @@ namespace Gad
 
         public static void Clear()
         {
+            if (inPlaceActive) LeaveInPlace();
             if (Root != null) UnityEngine.Object.Destroy(Root.gameObject);
             Root = null; Current = null; Unit = 0; Level = null; Ctr = null; Elevator.I = null;
             Points.Clear(); pointsFlushed = 0;
@@ -93,13 +102,16 @@ namespace Gad
         // ------------------------------------------------------------------ 0.8: shops built inside their own building
 
         public static bool InPlaceMode;
-        static bool inPlaceActive;
+        static bool inPlaceActive, storefrontMode;
+        /// <summary>A point in the current building's own space (its ground floor door is the origin), in the world.</summary>
+        public static Vector3 ToWorld(Vector3 local) => Root != null ? Root.TransformPoint(local) : O + local;
+        public static float Yaw(float local) => (Root != null ? Root.eulerAngles.y : 0f) + local;
 
         /// <summary>
         /// Builds the ground floor of a shop at its real place (pos/rot = the front door, facing in),
         /// shrunk by scale to fit the building. The current interior state is left as it was.
         /// </summary>
-        public static GameObject BuildInPlace(Bld b, Vector3 pos, Quaternion rot, float scale, out List<ActionPoint> points)
+        public static GameObject BuildInPlace(Bld b, Vector3 pos, Quaternion rot, float scale, bool storefront, out List<ActionPoint> points)
         {
             var sCur = Current; var sRoot = Root; var sLevel = Level; var sCtr = Ctr; int sUnit = Unit;
             var sPts = new List<ActionPoint>(Points); int sFl = pointsFlushed; var sMb = mb; var sRng = rng;
@@ -110,8 +122,14 @@ namespace Gad
             Root.SetPositionAndRotation(pos, rot);
             Root.localScale = Vector3.one * Mathf.Min(1f, scale);
             Level = null; Unit = 0;
-            InPlaceMode = true;
-            try { BuildLevel(0); }
+            var ls = LobbySize(b);
+            EX = ls.x / 2 - 2.2f; EZ = ls.y - 1.25f;
+            InPlaceMode = true; storefrontMode = storefront;
+            try
+            {
+                if (HasLift(b)) Elevator.Make(Root, b, 0, new Vector3(EX, 0, EZ));
+                BuildLevel(0);
+            }
             finally { InPlaceMode = false; }
             points = new List<ActionPoint>(Points);
             var go = Root.gameObject;
@@ -132,16 +150,28 @@ namespace Gad
         }
 
         /// <summary>The player walked into a shop built in place: its counters and actions become the current ones.</summary>
-        public static void UseInPlace(Bld b, List<ActionPoint> pts)
+        public static void UseInPlace(Bld b, Transform root, List<ActionPoint> pts)
         {
+            if (Root != null && !inPlaceActive) Clear();
             Current = b; inPlaceActive = true;
+            Root = root; Unit = 0;
+            Level = null;
+            foreach (Transform c in root) if (c.name.StartsWith("Level")) Level = c;
+            Ctr = Level;
+            Elevator.I = root.GetComponentInChildren<Elevator>();
+            var ls = LobbySize(b);
+            EX = ls.x / 2 - 2.2f; EZ = ls.y - 1.25f;
+            storefrontMode = InPlace.Storefront(b);
             Points.Clear(); Points.AddRange(pts);
         }
 
         public static void LeaveInPlace()
         {
             if (!inPlaceActive) return;
-            inPlaceActive = false; Current = null;
+            // back to the lobby so the building looks right from the street
+            if (Unit != 0 && Root != null) { InPlaceMode = true; try { BuildLevel(0); } finally { InPlaceMode = false; } }
+            inPlaceActive = false; Current = null; Root = null; Level = null; Ctr = null; Elevator.I = null; Unit = 0;
+            WorldBuilder.SetCityColliders(true);
             Points.Clear();
             Work.Cancel("Вы ушли со смены");
         }
@@ -177,23 +207,57 @@ namespace Gad
             // floor + ceiling
             mb.Box(Mats.Lit(wall * 0.8f), floor, new Vector3(-w / 2, -0.3f, 0), new Vector3(w / 2, 0, d), new Vector2(4, 4));
             mb.Box(wallMat, wallMat, new Vector3(-w / 2, h, 0), new Vector3(w / 2, h + 0.2f, d), new Vector2(4, 4), default, true, Mats.Lit(new Color(0.92f, 0.92f, 0.9f)));
-            // walls (door gap in the south wall); built in place the front is the building's glass shop front
-            if (InPlaceMode) { windows = false; street = false; }
-            else
+            // walls (door gap in the south wall). Built in place: shops have the building's glass front
+            // instead; other buildings have real window openings in the side walls onto the street.
+            bool shopFront = InPlaceMode && storefrontMode;
+            bool realWindows = InPlaceMode && !storefrontMode && windows && Unit == 0;
+            if (InPlaceMode) street = false;
+            if (!shopFront)
             {
                 mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, -0.3f), new Vector3(-dh, h, 0), new Vector2(4, 4));
                 mb.Box(wallMat, wallMat, new Vector3(dh, 0, -0.3f), new Vector3(w / 2 + 0.3f, h, 0), new Vector2(4, 4));
                 mb.Box(wallMat, wallMat, new Vector3(-dh, 2.7f, -0.3f), new Vector3(dh, h, 0), new Vector2(4, 4));
             }
             mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, d), new Vector3(w / 2 + 0.3f, h, d + 0.3f), new Vector2(4, 4));
-            mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, 0), new Vector3(-w / 2, h, d), new Vector2(4, 4));
-            mb.Box(wallMat, wallMat, new Vector3(w / 2, 0, 0), new Vector3(w / 2 + 0.3f, h, d), new Vector2(4, 4));
+            if (realWindows)
+            {
+                float wy0 = 1f, wy1 = Mathf.Min(h - 0.6f, 2.6f);
+                var glass = Mats.Glass(new Color(0.75f, 0.85f, 0.9f, 0.18f));
+                var frame = Mats.Lit(new Color(0.92f, 0.92f, 0.9f), 0.4f);
+                foreach (float sx in new[] { -1f, 1f })
+                {
+                    float xa = sx < 0 ? -w / 2 - 0.3f : w / 2, xb = sx < 0 ? -w / 2 : w / 2 + 0.3f;
+                    float at = 0f;
+                    for (float z = 3; z < d - 2; z += 5)
+                    {
+                        mb.Box(wallMat, wallMat, new Vector3(xa, 0, at), new Vector3(xb, h, z), new Vector2(4, 4));
+                        mb.Box(wallMat, wallMat, new Vector3(xa, 0, z), new Vector3(xb, wy0, z + 2.6f), new Vector2(4, 4));
+                        mb.Box(wallMat, wallMat, new Vector3(xa, wy1, z), new Vector3(xb, h, z + 2.6f), new Vector2(4, 4));
+                        // a white frame with a sill and a mullion; clear glass onto the street
+                        mb.Box(frame, frame, new Vector3(xa - 0.02f, wy0 - 0.06f, z - 0.05f), new Vector3(xb + 0.02f, wy0, z + 2.65f), new Vector2(1, 1));
+                        mb.Box(frame, frame, new Vector3(xa, wy1, z - 0.05f), new Vector3(xb, wy1 + 0.06f, z + 2.65f), new Vector2(1, 1));
+                        mb.Box(frame, frame, new Vector3(xa, wy0, z + 1.27f), new Vector3(xb, wy1, z + 1.33f), new Vector2(1, 1));
+                        float gx = (xa + xb) / 2f;
+                        mb.Quad(glass, new Vector3(gx, wy0, z), new Vector3(gx, wy1, z), new Vector3(gx, wy1, z + 2.6f), new Vector3(gx, wy0, z + 2.6f), Vector2.zero, Vector2.up, Vector2.one, Vector2.right);
+                        mb.Quad(glass, new Vector3(gx, wy0, z + 2.6f), new Vector3(gx, wy1, z + 2.6f), new Vector3(gx, wy1, z), new Vector3(gx, wy0, z), Vector2.zero, Vector2.up, Vector2.one, Vector2.right);
+                        at = z + 2.6f;
+                    }
+                    mb.Box(wallMat, wallMat, new Vector3(xa, 0, at), new Vector3(xb, h, d), new Vector2(4, 4));
+                }
+                windows = false;
+            }
+            else
+            {
+                mb.Box(wallMat, wallMat, new Vector3(-w / 2 - 0.3f, 0, 0), new Vector3(-w / 2, h, d), new Vector2(4, 4));
+                mb.Box(wallMat, wallMat, new Vector3(w / 2, 0, 0), new Vector3(w / 2 + 0.3f, h, d), new Vector2(4, 4));
+            }
+            if (InPlaceMode && Unit == 0) windows = false;
             // skirting
             var sk = Mats.Lit(wall * 0.6f);
             mb.Box(sk, sk, new Vector3(-w / 2, 0, d - 0.05f), new Vector3(w / 2, 0.12f, d), new Vector2(4, 4));
             // exit door: light rectangle with the street behind
             if (street) mb.Box(ViewGlass(), null, new Vector3(-1.4f, 0, -0.62f), new Vector3(1.4f, 2.7f, -0.6f), new Vector2(4, 4));
-            if (!InPlaceMode) mb.Box(Mats.Lit(new Color(0.2f, 0.2f, 0.22f)), null, new Vector3(-dh - 0.1f, 2.7f, -0.05f), new Vector3(dh + 0.1f, 2.85f, 0.05f), new Vector2(4, 4));
+            if (!shopFront) mb.Box(Mats.Lit(new Color(0.2f, 0.2f, 0.22f)), null, new Vector3(-dh - 0.1f, 2.7f, -0.05f), new Vector3(dh + 0.1f, 2.85f, 0.05f), new Vector2(4, 4));
             if (windows)
             {
                 var glow = ViewGlass();
@@ -572,6 +636,14 @@ namespace Gad
         /// <summary>Builds one floor of the current building (0 = ground floor), replacing the previous one.</summary>
         public static void BuildLevel(int floor)
         {
+            if (inPlaceActive && !InPlaceMode)
+            {   // a floor of a building entered for real: build it in place (and tell the walls)
+                InPlaceMode = true;
+                try { BuildLevel(floor); } finally { InPlaceMode = false; }
+                WorldBuilder.SetCityColliders(floor == 0);
+                InPlace.FloorChanged(floor);
+                return;
+            }
             var b = Current;
             if (Level != null) UnityEngine.Object.Destroy(Level.gameObject);
             Points.Clear(); pointsFlushed = 0;
